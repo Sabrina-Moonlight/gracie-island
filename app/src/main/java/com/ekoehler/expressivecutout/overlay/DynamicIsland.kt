@@ -857,8 +857,7 @@ fun DynamicIsland(
     // stuck-to-camera pill is barely wider than its own icon.
     // Mounted for as long as the feature is on rather than only while something is in use, so each
     // dot fades in and out with its own resource instead of appearing the instant the row exists.
-    val showPermissionDots = permissionDotsEnabled && !isExpanded && !isCall && !isStickToCamera &&
-        !isTiny
+    val showPermissionDots = permissionDotsEnabled && !isExpanded && !isCall && !isTiny
     val permissionDotsOnLeft = permissionDotPosition == PermissionDotPosition.LEFT
     // Only a tile that writes on the trailing edge — the timer's remaining time, a progress ring,
     // a battery percentage, the status dot — has anything for the dots to collide with. Everything
@@ -871,11 +870,14 @@ fun DynamicIsland(
 
     // Read from [event] or [shownEvent]: keeps the trailing width stable while the pill is visible
     // or fading out, but clears it for the resting empty pill.
+    // The status dot sits on that same trailing edge, so the permission dots must make room for it too.
+    val statusDotOnPill = !emptyPill && !isStickToCamera && !isTiny && !isCall && !isExpanded &&
+        statusDotEnabled && (event ?: shownEvent)?.statusDotColor != null
     val hasTrailingContent = !emptyPill &&
-        (event ?: shownEvent)?.hasCollapsedTrailingContent() == true
+        ((event ?: shownEvent)?.hasCollapsedTrailingContent() == true || statusDotOnPill)
 
     // The status dot never starts before the badge, so it steps past dots drawn on the left
-    val collapsedLeadingInsetDp = if (showPermissionDots && permissionDotsOnLeft) {
+    val collapsedLeadingInsetDp = if (showPermissionDots && !isStickToCamera && permissionDotsOnLeft) {
         permissionDotLeadingInsetDp(permissionUsage, collapsed.heightDp, permissionDotsVertical)
     } else {
         0
@@ -883,7 +885,7 @@ fun DynamicIsland(
 
     // Room for dots beside that content: the pill grows to the right by this much and the content is
     // inset by the same amount, so the content doesn't move and the dots sit in the new space.
-    val collapsedTrailingInsetDp = if (showPermissionDots && !permissionDotsOnLeft && hasTrailingContent) {
+    val collapsedTrailingInsetDp = if (showPermissionDots && !isStickToCamera && !permissionDotsOnLeft && hasTrailingContent) {
         permissionDotTrailingInsetDp(permissionUsage, collapsed.heightDp, permissionDotsVertical)
     } else {
         0
@@ -907,15 +909,16 @@ fun DynamicIsland(
     // Where the pill's leading edge sits from the screen's centre before any growth decides how far
     // the status dot is from the camera. A bubble beside the pill takes width from one side and
     // steps the centre away from it, which is what [satelliteShiftDp] and [satelliteSplitDp] carry.
-    val statusDotOnPill = !emptyPill && !isStickToCamera && !isTiny && !isCall && !isExpanded &&
-        statusDotEnabled && (event ?: shownEvent)?.statusDotColor != null
-    val pillLeftEdgeDp = dims.offsetXDp + satelliteShiftDp -
+    // The pill now grows evenly on both sides, so the island stays centred on the camera: its left edge
+    // moves out by the dots' room, its right edge by the same, and the status dot is measured from there.
+    val pillLeftBaseDp = dims.offsetXDp + satelliteShiftDp -
         (displayWidthExactDp * dims.widthPercent / 100f - satelliteSplitDp) / 2f
+    val pillRightBaseDp = pillLeftBaseDp + (displayWidthExactDp * dims.widthPercent / 100f - satelliteSplitDp)
+    val pillLeftEdgeDp = pillLeftBaseDp - collapsedTrailingInsetDp
     // The status dot sits just past the camera hole, on the pill's trailing side. The pill grows on
     // its trailing edge when the dot would not otherwise fit there, the way it grows to seat the
     // permission dots.
-    val pillRightEdgeDp = pillLeftEdgeDp +
-        (displayWidthExactDp * dims.widthPercent / 100f - satelliteSplitDp) + collapsedTrailingInsetDp
+    val pillRightEdgeDp = pillRightBaseDp
     val statusDotGrowthDp = if (statusDotOnPill) {
         statusDotTrailingGrowthDp(
             pillLeftEdgeDp, pillRightEdgeDp, cameraRightEdgeDp, collapsed.heightDp, collapsedLeadingInsetDp,
@@ -930,7 +933,7 @@ fun DynamicIsland(
     // sides, staying centred, until the text starts past the hole.
     val textGrowthDp = if (!emptyPill && !isStickToCamera && !isTiny && !isCall && !isExpanded) {
         trailingTextGrowthDp(
-            pillLeftEdgeDp + (displayWidthExactDp * dims.widthPercent / 100f - satelliteSplitDp),
+            pillRightBaseDp,
             cameraRightEdgeDp,
             collapsed.heightDp,
             (event ?: shownEvent)?.collapsedTrailingTextLength() ?: 0,
@@ -939,8 +942,8 @@ fun DynamicIsland(
         0
     }
     val targetWidth = if (isStickToCamera) collapsed.heightDp.dp
-        else (displayWidthExactDp * dims.widthPercent / 100f).dp + collapsedTrailingInsetDp.dp +
-            statusDotGrowthDp.dp + (textGrowthDp * 2).dp - satelliteSplitDp.dp
+        else (displayWidthExactDp * dims.widthPercent / 100f).dp + (collapsedTrailingInsetDp * 2).dp +
+            (statusDotGrowthDp * 2).dp + (textGrowthDp * 2).dp - satelliteSplitDp.dp
     val targetHeight = if (isStickToCamera) (displayWidthDp * dims.widthPercent / 100f).dp
         else (dims.heightDp + heightBonus).dp
     val width by animateDpAsState(targetWidth, spec, label = "islandWidth")
@@ -976,7 +979,7 @@ fun DynamicIsland(
     // the tile's icon sits — stays put.
     val offsetX by animateDpAsState(
         if (isStickToCamera) 0.dp
-        else dims.offsetXDp.dp + ((collapsedTrailingInsetDp + statusDotGrowthDp) / 2f).dp + satelliteShiftDp.dp,
+        else dims.offsetXDp.dp + satelliteShiftDp.dp,
         spec, label = "islandOffsetX"
     )
     val offsetY by animateDpAsState(if (isStickToCamera) 0.dp else dims.offsetYDp.dp, spec, label = "islandOffsetY")
@@ -1417,12 +1420,23 @@ fun DynamicIsland(
                         exit = fadeOut(motion.swapFade()),
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
+                            // Stuck to the camera the dots stack at the end opposite the badge, under the
+                            // transport button when the music tile has one.
+                            val stickButtonRoomDp = if (shownEvent?.media?.let { it.rightButton && !it.miniPlayer } == true) {
+                                (collapsed.heightDp * (0.14f + BADGE_SIZE_FRACTION)).toInt()
+                            } else {
+                                0
+                            }
                             PermissionDotRow(
                                 usage = permissionUsage,
                                 colors = permissionDotColors,
                                 heightDp = collapsed.heightDp,
-                                vertical = permissionDotsVertical,
-                                modifier = Modifier
+                                vertical = permissionDotsVertical || isStickToCamera,
+                                modifier = if (isStickToCamera) {
+                                    Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = ((collapsed.heightDp * 0.14f).toInt() + stickButtonRoomDp).dp)
+                                } else Modifier
                                     .align(
                                         if (permissionDotsOnLeft) Alignment.CenterStart
                                         else Alignment.CenterEnd
@@ -2310,7 +2324,7 @@ private fun CollapsedContent(
     // The music tile's single transport button, opposite its cover. Never on the stuck-to-camera
     // pill (barely wider than the badge) nor beside the tiny player, which has no room for it.
     val rightButton = event.media
-        ?.takeIf { it.rightButton && !it.miniPlayer && !isStickToCamera }
+        ?.takeIf { it.rightButton && !it.miniPlayer }
         ?.rightButtonAction
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -2371,9 +2385,16 @@ private fun CollapsedContent(
             MediaNormalButton(
                 action = action,
                 heightDp = heightDp,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = (heightDp * 0.16f).dp + trailingInsetDp.dp),
+                // Stuck to the camera the strip runs vertically: the button sits on the end opposite the badge.
+                modifier = if (isStickToCamera) {
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = (heightDp * 0.14f).dp)
+                } else {
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = (heightDp * 0.16f).dp + trailingInsetDp.dp)
+                },
             )
         }
         // Trailing text (e.g. battery percentage for charging/battery low)

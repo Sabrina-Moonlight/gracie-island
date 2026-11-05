@@ -1520,11 +1520,10 @@ class IslandOverlayController(private val context: Context) {
         val trailingGrowthPx = (statusDotGrowthDp(false) * density).toInt()
         val textGrowthPx = (textGrowthDp(false) * density).toInt()
         val splitPx = (satelliteSplitDp() * density).toInt()
-        val pillWidthPx = displayWidthPx * dims.widthPercent / 100 + dotBonusPx + trailingGrowthPx + textGrowthPx * 2 - splitPx +
+        val pillWidthPx = displayWidthPx * dims.widthPercent / 100 + dotBonusPx * 2 + trailingGrowthPx * 2 + textGrowthPx * 2 - splitPx +
             notchOverhangPx(dims)
         val margin = (TOUCH_MARGIN_DP * density).toInt()
-        val centerX = viewWidth / 2 + (dims.offsetXDp * density).toInt() + dotBonusPx / 2 +
-            trailingGrowthPx / 2 + satelliteShiftPx(splitPx)
+        val centerX = viewWidth / 2 + (dims.offsetXDp * density).toInt() + satelliteShiftPx(splitPx)
         val step = pillWidthPx / 2 + gapPx + diameterPx / 2
         val satelliteCenterX = if (behaviourState.value.satellitePosition == SatellitePosition.LEFT) {
             centerX - step
@@ -1576,14 +1575,12 @@ class IslandOverlayController(private val context: Context) {
         val trailingGrowthPx = (statusDotGrowthDp(expanded) * density).toInt()
         val textGrowthPx = (textGrowthDp(expanded) * density).toInt()
         val splitPx = (satelliteSplitDp() * density).toInt()
-        val pillWidthPx = displayWidthPx * dims.widthPercent / 100 + dotBonusPx + trailingGrowthPx + textGrowthPx * 2 - splitPx +
+        val pillWidthPx = displayWidthPx * dims.widthPercent / 100 + dotBonusPx * 2 + trailingGrowthPx * 2 + textGrowthPx * 2 - splitPx +
             notchOverhangPx(dims)
         val margin = (TOUCH_MARGIN_DP * density).toInt()
-        // The pill grows to the right for both the dots and the status dot, so its centre
-        // moves with it; a bubble beside it pushes the centre the other way by half of the width it
-        // gave up.
-        val centerX = viewWidth / 2 + (dims.offsetXDp * density).toInt() + dotBonusPx / 2 +
-            trailingGrowthPx / 2 + satelliteShiftPx(splitPx)
+        // The pill grows evenly on both sides for the dots and the status dot, so its centre stays
+        // put; a bubble beside it pushes the centre away by half of the width it gave up.
+        val centerX = viewWidth / 2 + (dims.offsetXDp * density).toInt() + satelliteShiftPx(splitPx)
         val topPx = (dims.offsetYDp * density).toInt()
         val bottomPx = ((dims.offsetYDp + dims.heightDp + dims.bottomEarDp + bonusDp) * density).toInt()
         return Rect(
@@ -1652,7 +1649,7 @@ class IslandOverlayController(private val context: Context) {
         // The window is centred on the screen, so a pill pushed off-centre (the tiny "Mini player"
         // parked beside the camera) needs twice its offset of extra width or it is clipped.
         val islandWidthDp = displayWidthDp.value * (dims.widthPercent / 100f) +
-            permissionDotWidthBonusDp(expanded) + statusDotGrowthDp(expanded) * 2 +
+            permissionDotWidthBonusDp(expanded) * 2 + statusDotGrowthDp(expanded) * 2 +
             textGrowthDp(expanded) * 2 + abs(dims.offsetXDp) * 2 +
             dims.notchOverhangDp * 2
         // Never wider than the screen: a window that overhangs it gets re-placed by the system on every
@@ -1680,7 +1677,11 @@ class IslandOverlayController(private val context: Context) {
         if (event?.call != null) return 0
         // Only grown for a tile that writes on the trailing edge; elsewhere the dots fit as they are.
         if (event == null) return 0
-        if (!event.hasCollapsedTrailingContent()) return 0
+        val isStickToCamera = orientationState.value == Configuration.ORIENTATION_LANDSCAPE &&
+            behaviourState.value.horizontalCutoutMode == HorizontalCutoutMode.STICK_TO_CAMERA
+        val statusDotShown = event.statusDotColor != null && behaviourState.value.showStatusDot &&
+            !isTinyTile(event) && !isStickToCamera
+        if (!event.hasCollapsedTrailingContent() && !statusDotShown) return 0
         return permissionDotTrailingInsetDp(
             PermissionUsageMonitor.usage.value,
             layoutState.value.collapsed.heightDp,
@@ -1708,8 +1709,9 @@ class IslandOverlayController(private val context: Context) {
             behaviourState.value.satellitePosition == SatellitePosition.LEFT -> splitDp / 2f
             else -> -splitDp / 2f
         }
-        val pillLeftDp = collapsed.offsetXDp + shiftDp -
+        val pillLeftBaseDp = collapsed.offsetXDp + shiftDp -
             (displayWidthExactDp.value * collapsed.widthPercent / 100f - splitDp) / 2f
+        val pillLeftDp = pillLeftBaseDp - permissionDotWidthBonusDp(false)
         val leftDotsDp = if (permissionDotsOnLeft()) {
             permissionDotLeadingInsetDp(
                 PermissionUsageMonitor.usage.value,
@@ -1719,9 +1721,8 @@ class IslandOverlayController(private val context: Context) {
         } else {
             0
         }
-        val pillRightDp = pillLeftDp +
-            (displayWidthExactDp.value * collapsed.widthPercent / 100f - splitDp) +
-            permissionDotWidthBonusDp(false)
+        val pillRightDp = pillLeftBaseDp +
+            (displayWidthExactDp.value * collapsed.widthPercent / 100f - splitDp)
         return statusDotTrailingGrowthDp(
             pillLeftDp, pillRightDp, cameraRightEdgeDp.value, collapsed.heightDp, leftDotsDp,
         )

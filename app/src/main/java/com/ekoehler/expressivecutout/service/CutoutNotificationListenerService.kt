@@ -712,8 +712,12 @@ class CutoutNotificationListenerService : NotificationListenerService() {
             DownloadNotificationParser.State.IN_PROGRESS -> {
                 // The event is emitted on the first sighting and again whenever the percentage moves,
                 // so the ring on the pill follows the download instead of staying frozen.
+                // Browsers often post an indeterminate bar (size unknown) or write the percentage in the
+                // text only: fall back to that, and to an empty ring, so the ring is always drawn.
                 val progress = getProgressDataOrNull(sbn)
-                val percent = progress?.let { it.current * 100 / it.max.coerceAtLeast(1) } ?: -1
+                    ?: downloadPercentFromText(sbn)?.let { ProgressData(max = 100, current = it, title = download.fileName) }
+                    ?: ProgressData(max = 100, current = 0, title = download.fileName)
+                val percent = progress.current * 100 / progress.max.coerceAtLeast(1)
                 val lastPercent = downloadPercents.put(sbn.key, percent)
                 if (previous != DownloadNotificationParser.State.IN_PROGRESS || lastPercent != percent) {
                     emitDownloadEvent(SystemEventType.DOWNLOAD_STARTED, download.fileName, progress)
@@ -736,6 +740,15 @@ class CutoutNotificationListenerService : NotificationListenerService() {
             }
         }
         return true
+    }
+
+    /** A percentage written in a download notification's text (\"45%\"), or null when there is none. */
+    private fun downloadPercentFromText(sbn: StatusBarNotification): Int? {
+        val extras = sbn.notification?.extras ?: return null
+        val text = listOf(Notification.EXTRA_TEXT, Notification.EXTRA_SUB_TEXT, Notification.EXTRA_INFO_TEXT)
+            .mapNotNull { extras.getCharSequence(it)?.toString() }
+            .joinToString(" ")
+        return Regex("(\\d{1,3})\\s?%").find(text)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it in 0..100 }
     }
 
     private fun emitDownloadEvent(type: SystemEventType, fileName: String?, progress: ProgressData? = null) {
