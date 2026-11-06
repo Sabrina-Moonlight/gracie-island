@@ -180,7 +180,9 @@ class MediaPlaybackMonitor(private val context: Context) {
      */
     private fun sync() {
         val validControllers = watched.keys.filter { controller ->
-            controller.packageName !in disabledApps && !isAssistantPackage(controller.packageName)
+            controller.packageName !in disabledApps &&
+                !isAssistantPackage(controller.packageName) &&
+                !controller.isEnded
         }
 
         val primary = validControllers.firstOrNull { it.isPlaying } ?: validControllers.firstOrNull()
@@ -246,6 +248,16 @@ class MediaPlaybackMonitor(private val context: Context) {
             IslandEventBus.emit(signal)
         }
     }
+
+    /** A session whose player stopped or errored out: the app was closed, so nothing is left to show. */
+    private val MediaController.isEnded: Boolean
+        get() = when (playbackState?.state) {
+            PlaybackState.STATE_STOPPED,
+            PlaybackState.STATE_NONE,
+            PlaybackState.STATE_ERROR,
+            -> true
+            else -> false
+        }
 
     /**
      * Playing, or in the brief hop between tracks. Players report SKIPPING_TO_NEXT/PREVIOUS while a

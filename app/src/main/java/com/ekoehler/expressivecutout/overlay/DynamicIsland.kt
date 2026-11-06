@@ -956,6 +956,18 @@ fun DynamicIsland(
             statusDotBoxDp(collapsed.heightDp),
     )
     val height by animateDpAsState(targetHeight, heightSpec, label = "islandHeight")
+    // Stuck to the camera the permission dots take the very end of the pill (the extreme, like the
+    // normal cutout) and the music button sits just inboard of them, so it needs to know how much
+    // of the column the lit dots occupy.
+    val stickDotsRoomDp by animateDpAsState(
+        if (isStickToCamera && showPermissionDots) {
+            (permissionUsage.count * collapsed.heightDp * (0.15f + 0.06f) + collapsed.heightDp * 0.06f).dp
+        } else {
+            0.dp
+        },
+        spec,
+        label = "stickDotsRoom",
+    )
 
     // While the window shrinks into the resting pill, its panel turns into the pill's own colour and
     // the dismiss glyph fades out, so the hand-over to the real pill is seamless.
@@ -1403,6 +1415,7 @@ fun DynamicIsland(
                                         heightDp = collapsed.heightDp,
                                         isStickToCamera = isStickToCamera,
                                         trailingInsetDp = collapsedTrailingInsetDp,
+                                        stickButtonTopInsetDp = stickDotsRoomDp.value.toInt(),
                                         statusDotStartDp = dotTrailingStartDp,
                                         iconPop = iconPop,
                                         statusDotEnabled = statusDotEnabled,
@@ -1420,13 +1433,8 @@ fun DynamicIsland(
                         exit = fadeOut(motion.swapFade()),
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
-                            // Stuck to the camera the dots stack at the end opposite the badge, under the
-                            // transport button when the music tile has one.
-                            val stickButtonRoomDp = if (shownEvent?.media?.let { it.rightButton && !it.miniPlayer } == true) {
-                                (collapsed.heightDp * (0.14f + BADGE_SIZE_FRACTION)).toInt()
-                            } else {
-                                0
-                            }
+                            // Stuck to the camera the dots stack at the very end opposite the badge; the
+                            // transport button (music tile) sits just below them.
                             PermissionDotRow(
                                 usage = permissionUsage,
                                 colors = permissionDotColors,
@@ -1435,7 +1443,7 @@ fun DynamicIsland(
                                 modifier = if (isStickToCamera) {
                                     Modifier
                                         .align(Alignment.TopCenter)
-                                        .padding(top = ((collapsed.heightDp * 0.14f).toInt() + stickButtonRoomDp).dp)
+                                        .padding(top = (collapsed.heightDp * 0.14f).dp)
                                 } else Modifier
                                     .align(
                                         if (permissionDotsOnLeft) Alignment.CenterStart
@@ -2317,6 +2325,7 @@ private fun CollapsedContent(
     heightDp: Int,
     isStickToCamera: Boolean = false,
     trailingInsetDp: Int = 0,
+    stickButtonTopInsetDp: Int = 0,
     statusDotStartDp: Float? = null,
     iconPop: Animatable<Float, AnimationVector1D>? = null,
     statusDotEnabled: Boolean = true,
@@ -2389,7 +2398,7 @@ private fun CollapsedContent(
                 modifier = if (isStickToCamera) {
                     Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = (heightDp * 0.14f).dp)
+                        .padding(top = (heightDp * 0.14f).dp + stickButtonTopInsetDp.dp)
                 } else {
                     Modifier
                         .align(Alignment.CenterEnd)

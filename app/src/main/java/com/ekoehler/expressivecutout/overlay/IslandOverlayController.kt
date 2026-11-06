@@ -1045,7 +1045,9 @@ class IslandOverlayController(private val context: Context) {
      */
     private fun observeNowPlaying() = scope.launch {
         NowPlayingBus.state.collect { now ->
-            musicPlaying = now?.isPlaying == true
+            // A paused session still counts as live: the pill stays up until the player app closes
+            // its session (the monitor drops stopped/ended sessions), not when playback pauses.
+            musicPlaying = now != null
             pruneSatellite()
             // Once the session ends there's nothing to return to.
             if (now == null) lastMusicEvent = null
