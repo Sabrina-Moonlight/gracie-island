@@ -39,6 +39,7 @@ jobs:
           echo "$DEBUG_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > ~/.android/debug.keystore
           keytool -list -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey > /dev/null \
             || { echo "::error::El secret DEBUG_KEYSTORE_BASE64 no es una llave valida (alias androiddebugkey, clave android)."; exit 1; }
+          echo "DEBUG_KEYSTORE_PATH=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
           echo "Using persistent signing key from secret."
 
       - name: Build Debug APK
@@ -47,9 +48,17 @@ jobs:
       - name: Show APK signing fingerprint
         run: |
           APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -n 1)
+          KEY_SHA=$(keytool -list -v -keystore "$DEBUG_KEYSTORE_PATH" -storepass android -alias androiddebugkey | grep 'SHA256:' | head -n 1 | sed 's/.*SHA256: *//; s/://g' | tr 'A-F' 'a-f')
+          echo "Llave guardada (secret) SHA-256: $KEY_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
           for f in app/build/outputs/apk/debug/*.apk; do
-            "$APKSIGNER" verify --print-certs "$f" | grep -i "SHA-256" | tee -a "$GITHUB_STEP_SUMMARY"
-          done || true
+            APK_SHA=$("$APKSIGNER" verify --print-certs "$f" | grep -i 'SHA-256 digest' | head -n 1 | sed 's/.*digest: *//')
+            echo "APK SHA-256: $APK_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+            if [ "$APK_SHA" != "$KEY_SHA" ]; then
+              echo "::error::El APK NO quedo firmado con la llave guardada. No se instalara como actualizacion."
+              exit 1
+            fi
+          done
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
