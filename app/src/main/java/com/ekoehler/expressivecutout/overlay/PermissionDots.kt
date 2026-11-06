@@ -90,6 +90,14 @@ internal fun permissionDotTrailingInsetDp(
 }
 
 /**
+ * How much the collapsed pill really has to grow for the dots: the room they need ([roomDp], see
+ * [permissionDotTrailingInsetDp]) less the [spareDp] the pill already has free beside its trailing
+ * content. Zero when the dots fit in the width the user chose, so the pill only widens when it must.
+ */
+internal fun permissionDotTrailingGrowthDp(roomDp: Int, spareDp: Float): Int =
+    kotlin.math.ceil((roomDp - spareDp).coerceAtLeast(0f)).toInt().coerceAtMost(roomDp)
+
+/**
  * The room [PermissionDotRow] needs on the trailing edge, so collapsed content that also sits there
  * can be shifted clear of it. Zero when there is nothing to draw.
  */

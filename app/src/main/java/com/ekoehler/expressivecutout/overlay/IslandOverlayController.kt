@@ -1684,11 +1684,29 @@ class IslandOverlayController(private val context: Context) {
         val statusDotShown = event.statusDotColor != null && behaviourState.value.showStatusDot &&
             !isTinyTile(event) && !isStickToCamera
         if (!event.hasCollapsedTrailingContent() && !statusDotShown) return 0
-        return permissionDotTrailingInsetDp(
+        val collapsed = layoutState.value.collapsed
+        val roomDp = permissionDotTrailingInsetDp(
             PermissionUsageMonitor.usage.value,
-            layoutState.value.collapsed.heightDp,
+            collapsed.heightDp,
             permissionDotVerticalState.value,
         )
+        if (roomDp == 0) return 0
+        // Same geometry as [DynamicIsland]: the dots only grow the pill by what its own width lacks.
+        val splitDp = satelliteSplitDp()
+        val shiftDp = when {
+            splitDp == 0 -> 0f
+            behaviourState.value.satellitePosition == SatellitePosition.LEFT -> splitDp / 2f
+            else -> -splitDp / 2f
+        }
+        val pillRightDp = collapsed.offsetXDp + shiftDp +
+            (displayWidthExactDp.value * collapsed.widthPercent / 100f - splitDp) / 2f
+        val spareDp = permissionDotSpareRoomDp(
+            pillRightDp,
+            cameraRightEdgeDp.value,
+            collapsed.heightDp,
+            event.collapsedTrailingContentWidthDp(collapsed.heightDp, statusDotShown),
+        )
+        return permissionDotTrailingGrowthDp(roomDp, spareDp)
     }
 
     /**

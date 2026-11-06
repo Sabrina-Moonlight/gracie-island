@@ -914,7 +914,21 @@ fun DynamicIsland(
     val pillLeftBaseDp = dims.offsetXDp + satelliteShiftDp -
         (displayWidthExactDp * dims.widthPercent / 100f - satelliteSplitDp) / 2f
     val pillRightBaseDp = pillLeftBaseDp + (displayWidthExactDp * dims.widthPercent / 100f - satelliteSplitDp)
-    val pillLeftEdgeDp = pillLeftBaseDp - collapsedTrailingInsetDp
+    // The dots' room is only added to the pill when its own width has no spare space for it.
+    val collapsedTrailingGrowthDp = if (collapsedTrailingInsetDp > 0) {
+        permissionDotTrailingGrowthDp(
+            collapsedTrailingInsetDp,
+            permissionDotSpareRoomDp(
+                pillRightBaseDp,
+                cameraRightEdgeDp,
+                collapsed.heightDp,
+                (event ?: shownEvent)?.collapsedTrailingContentWidthDp(collapsed.heightDp, statusDotOnPill) ?: 0f,
+            ),
+        )
+    } else {
+        0
+    }
+    val pillLeftEdgeDp = pillLeftBaseDp - collapsedTrailingGrowthDp
     // The status dot sits just past the camera hole, on the pill's trailing side. The pill grows on
     // its trailing edge when the dot would not otherwise fit there, the way it grows to seat the
     // permission dots.
@@ -942,7 +956,7 @@ fun DynamicIsland(
         0
     }
     val targetWidth = if (isStickToCamera) collapsed.heightDp.dp
-        else (displayWidthExactDp * dims.widthPercent / 100f).dp + (collapsedTrailingInsetDp * 2).dp +
+        else (displayWidthExactDp * dims.widthPercent / 100f).dp + (collapsedTrailingGrowthDp * 2).dp +
             (statusDotGrowthDp * 2).dp + (textGrowthDp * 2).dp - satelliteSplitDp.dp
     val targetHeight = if (isStickToCamera) (displayWidthDp * dims.widthPercent / 100f).dp
         else (dims.heightDp + heightBonus).dp
@@ -2249,6 +2263,50 @@ internal fun trailingTextGrowthDp(
     val textStart = pillRightEdgeDp - heightDp * COLLAPSED_TRAILING_INSET_FRACTION - textWidth
     return kotlin.math.ceil(cameraRightEdgeDp + STATUS_DOT_CAMERA_GAP_DP - textStart)
         .coerceAtLeast(0f).toInt()
+}
+
+/**
+ * How wide the trailing content of the collapsed pill is for [this] event (the timer's remaining
+ * time, the progress ring, the music button, the trailing text or the status dot), estimated on the
+ * generous side so the dots are never drawn over it. Zero when it draws nothing there.
+ */
+internal fun IslandEvent.collapsedTrailingContentWidthDp(heightDp: Int, statusDotShown: Boolean): Float {
+    val charWidth = heightDp * TRAILING_TEXT_SIZE_FRACTION * TRAILING_TEXT_CHAR_WIDTH_EM
+    var width = 0f
+    if (timer != null) width = maxOf(width, TIMER_TEXT_CHARS * charWidth)
+    if (progressData != null && !progressData.isComplete) width = maxOf(width, heightDp * 0.5f)
+    if (media?.rightButton == true && !media.miniPlayer) width = maxOf(width, heightDp * BADGE_SIZE_FRACTION)
+    if (timer == null && progressData == null && !(media?.rightButton == true)) {
+        width = maxOf(width, collapsedTrailingTextLength() * charWidth)
+    }
+    if (statusDotShown) width = maxOf(width, statusDotBoxDp(heightDp))
+    return width
+}
+
+/** The most characters the timer's remaining time is expected to take ("1:02:03"). */
+private const val TIMER_TEXT_CHARS = 7
+
+/**
+ * The width the collapsed pill already has free between the camera hole and its trailing content,
+ * which the permission dots can use without the pill growing. Zero when it is already full, or when
+ * the device reports no cutout (then the pill grows by the dots' whole room, as before).
+ *
+ * Shared by [DynamicIsland]'s drawing and the overlay's window sizing.
+ *
+ * @param pillRightBaseDp the pill's trailing edge at the width the user chose, from the screen's
+ *   horizontal centre.
+ * @param contentWidthDp see [collapsedTrailingContentWidthDp].
+ */
+internal fun permissionDotSpareRoomDp(
+    pillRightBaseDp: Float,
+    cameraRightEdgeDp: Float?,
+    heightDp: Int,
+    contentWidthDp: Float,
+): Float {
+    if (cameraRightEdgeDp == null) return 0f
+    val contentEnd = pillRightBaseDp - heightDp * COLLAPSED_TRAILING_INSET_FRACTION
+    val limit = cameraRightEdgeDp + STATUS_DOT_CAMERA_GAP_DP
+    return (contentEnd - contentWidthDp - limit).coerceAtLeast(0f)
 }
 
 /**
