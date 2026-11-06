@@ -975,7 +975,10 @@ fun DynamicIsland(
     // of the column the lit dots occupy.
     val stickDotsRoomDp by animateDpAsState(
         if (isStickToCamera && showPermissionDots) {
-            (permissionUsage.count * collapsed.heightDp * (0.20f + 0.14f) + collapsed.heightDp * 0.06f).dp
+            // The dots keep the same distance from the pill's end as on the normal pill, so the button
+            // below them steps down by that extra margin whenever a dot is lit.
+            (permissionUsage.count * collapsed.heightDp * (0.20f + 0.14f) + collapsed.heightDp * 0.06f +
+                (if (permissionUsage.count > 0) permissionDotEndInsetDp(collapsed.heightDp) - collapsed.heightDp * 0.14f else 0f)).dp
         } else {
             0.dp
         },
@@ -1458,7 +1461,7 @@ fun DynamicIsland(
                                 modifier = if (isStickToCamera) {
                                     Modifier
                                         .align(Alignment.TopCenter)
-                                        .padding(top = (collapsed.heightDp * 0.14f).dp)
+                                        .padding(top = permissionDotEndInsetDp(collapsed.heightDp).dp)
                                 } else Modifier
                                     .align(
                                         if (permissionDotsOnLeft) Alignment.CenterStart
