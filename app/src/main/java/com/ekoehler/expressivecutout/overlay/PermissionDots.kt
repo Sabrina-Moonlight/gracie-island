@@ -145,12 +145,15 @@ internal fun PermissionDotRow(
     heightDp: Int,
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
+    fullSizeDots: Boolean = false,
 ) {
     // Microphone, camera, location — declared once so both directions draw the same three dots.
+    // [fullSizeDots] keeps the dots at their normal size even when stacked: the pill stuck to the
+    // camera is long, so there is no need to shrink them.
     val dots: @Composable () -> Unit = {
-        PermissionDot(usage.microphone, colors.microphone.resolve(), heightDp, vertical)
-        PermissionDot(usage.camera, colors.camera.resolve(), heightDp, vertical)
-        PermissionDot(usage.location, colors.location.resolve(), heightDp, vertical)
+        PermissionDot(usage.microphone, colors.microphone.resolve(), heightDp, vertical, fullSizeDots)
+        PermissionDot(usage.camera, colors.camera.resolve(), heightDp, vertical, fullSizeDots)
+        PermissionDot(usage.location, colors.location.resolve(), heightDp, vertical, fullSizeDots)
     }
 
     if (vertical) {
@@ -179,9 +182,10 @@ internal fun PermissionDotRow(
  * still fit inside the pill's height.
  */
 @Composable
-private fun PermissionDot(visible: Boolean, color: Color, heightDp: Int, vertical: Boolean) {
-    val sizeFraction = if (vertical) VERTICAL_DOT_SIZE_FRACTION else DOT_SIZE_FRACTION
-    val gapFraction = if (vertical) VERTICAL_DOT_GAP_FRACTION else DOT_GAP_FRACTION
+private fun PermissionDot(visible: Boolean, color: Color, heightDp: Int, vertical: Boolean, fullSize: Boolean) {
+    val small = vertical && !fullSize
+    val sizeFraction = if (small) VERTICAL_DOT_SIZE_FRACTION else DOT_SIZE_FRACTION
+    val gapFraction = if (small) VERTICAL_DOT_GAP_FRACTION else DOT_GAP_FRACTION
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn() + scaleIn(initialScale = 0.4f) +

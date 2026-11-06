@@ -975,7 +975,7 @@ fun DynamicIsland(
     // of the column the lit dots occupy.
     val stickDotsRoomDp by animateDpAsState(
         if (isStickToCamera && showPermissionDots) {
-            (permissionUsage.count * collapsed.heightDp * (0.15f + 0.06f) + collapsed.heightDp * 0.06f).dp
+            (permissionUsage.count * collapsed.heightDp * (0.20f + 0.14f) + collapsed.heightDp * 0.06f).dp
         } else {
             0.dp
         },
@@ -1454,6 +1454,7 @@ fun DynamicIsland(
                                 colors = permissionDotColors,
                                 heightDp = collapsed.heightDp,
                                 vertical = permissionDotsVertical || isStickToCamera,
+                                fullSizeDots = isStickToCamera,
                                 modifier = if (isStickToCamera) {
                                     Modifier
                                         .align(Alignment.TopCenter)
