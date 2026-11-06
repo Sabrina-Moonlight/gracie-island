@@ -16,6 +16,21 @@ android {
         versionName = "0.4.0"
     }
 
+    // Same key on every build: when the workflow hands over a key file (DEBUG_KEYSTORE_PATH), the debug
+    // APK is signed with exactly that file, so each build installs as an update over the previous one.
+    signingConfigs {
+        val debugKeystorePath = System.getenv("DEBUG_KEYSTORE_PATH")
+        if (!debugKeystorePath.isNullOrBlank()) {
+            check(file(debugKeystorePath).exists()) { "DEBUG_KEYSTORE_PATH apunta a un archivo que no existe: $debugKeystorePath" }
+            getByName("debug") {
+                storeFile = file(debugKeystorePath)
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
