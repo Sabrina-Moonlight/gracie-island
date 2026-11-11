@@ -1521,7 +1521,7 @@ fun DynamicIsland(
             ?: shownEvent?.actions?.firstOrNull()
         val capsuleCall = shownEvent?.call
         val capsuleReveal = minOf(reveal.value, callSplitReveal.value)
-        if (capsuleAction != null && capsuleCall != null && capsuleReveal > 0.01f) {
+        if (capsuleCall != null && capsuleReveal > 0.01f) {
             val capsuleWidthDp = callSplitHangUpWidthDp(dims.heightDp)
             val step = revealWidth / 2 + callSplitGapDp(notched).dp + (capsuleWidthDp / 2).dp
             // Dropped and shortened by the same amount beside a notch, so it keeps the notch's own
@@ -1529,28 +1529,34 @@ fun DynamicIsland(
             // alone: the capsule stays as wide as the pill is tall, which is what the touchable
             // region reserves for it.
             val capsuleInsetDp = if (notched) CALL_SPLIT_NOTCH_INSET_DP else 0
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(x = offsetX + step, y = offsetY + capsuleInsetDp.dp),
-            ) {
-                CallHangUpCapsule(
-                    call = capsuleCall,
-                    hangUp = capsuleAction,
-                    heightDp = dims.heightDp - capsuleInsetDp,
-                    widthDp = capsuleWidthDp,
-                    onAction = onAction,
-                    modifier = Modifier.graphicsLayer {
-                        scaleX = capsuleReveal
-                        scaleY = capsuleReveal
-                        alpha = capsuleReveal
-                    },
-                )
+            if (capsuleAction != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(x = offsetX + step, y = offsetY + capsuleInsetDp.dp),
+                ) {
+                    CallHangUpCapsule(
+                        call = capsuleCall,
+                        hangUp = capsuleAction,
+                        heightDp = dims.heightDp - capsuleInsetDp,
+                        widthDp = capsuleWidthDp,
+                        onAction = onAction,
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = capsuleReveal
+                            scaleY = capsuleReveal
+                            alpha = capsuleReveal
+                        },
+                    )
+                }
             }
             // The deafen toggle rides one gap past the hang-up capsule: a round button as tall as it.
             val deafenDiameterDp = dims.heightDp - capsuleInsetDp
-            val deafenStep = step + (capsuleWidthDp / 2).dp + callSplitGapDp(notched).dp +
-                (deafenDiameterDp / 2).dp
+            // Takes the capsule's place when the call app gave no hang-up action to draw one for.
+            val deafenStep = if (capsuleAction != null) {
+                step + (capsuleWidthDp / 2).dp + callSplitGapDp(notched).dp + (deafenDiameterDp / 2).dp
+            } else {
+                revealWidth / 2 + callSplitGapDp(notched).dp + (deafenDiameterDp / 2).dp
+            }
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -4539,7 +4545,8 @@ internal fun callSplitHangUpWidthDp(heightDp: Int): Int = (heightDp * CALL_SPLIT
  * Whether the call cutout is drawn split — the normal pill plus the detached hang-up capsule. Only a
  * connected call at its normal size qualifies: a ringing one needs its caller and two buttons, the
  * tiny "Mini call" pill has room for neither, and the expanded card carries its own hang-up row.
- * There is nothing to detach either when the dialer gives us no action or the user hid the buttons.
+ * There is nothing to detach when the user hid the buttons. A call app that offers no action still
+ * splits, because the deafen toggle beside the pill needs nothing from the app.
  */
 internal fun usesSplitCallCutout(
     event: IslandEvent?,
@@ -4548,7 +4555,7 @@ internal fun usesSplitCallCutout(
     tiny: Boolean,
 ): Boolean {
     val call = event?.call ?: return false
-    return callOngoing && !expanded && !tiny && call.showActions && event.actions.isNotEmpty()
+    return callOngoing && !expanded && !tiny && call.showActions
 }
 
 /**

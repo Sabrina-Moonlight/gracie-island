@@ -48,7 +48,21 @@ object CallNotificationParser {
      * (CallStyle sets it automatically), so it alone reliably identifies a call notification.
      */
     fun isCall(sbn: StatusBarNotification): Boolean =
-        sbn.notification?.category == Notification.CATEGORY_CALL
+        sbn.notification?.category == Notification.CATEGORY_CALL || isVoiceChat(sbn)
+
+    /**
+     * Voice-chat apps keep a call going with a plain foreground-service notification that carries
+     * no call category, no CallStyle and no chronometer, so none of the signals above ever fire for
+     * them. The package plus the ongoing flag is what identifies one, and it is by definition
+     * already connected: there is no ringing state to wait for.
+     */
+    private fun isVoiceChat(sbn: StatusBarNotification): Boolean =
+        sbn.packageName in voiceChatPackages &&
+            sbn.notification != null &&
+            sbn.notification.flags and Notification.FLAG_ONGOING_EVENT != 0
+
+    /** Apps whose ongoing notification is a live voice call; see [isVoiceChat]. */
+    private val voiceChatPackages = setOf("com.discord")
 
     /**
      * Reads a call notification into the shape the phone tile needs: caller label, photo, whether
@@ -77,8 +91,9 @@ object CallNotificationParser {
         val ongoing = when (callType(extras)) {
             CALL_TYPE_INCOMING -> false
             CALL_TYPE_ONGOING -> true
-            // No explicit type (older dialers): a running timer means it's connected.
-            else -> startTimeMs != null
+            // No explicit type (older dialers): a running timer means it's connected. A voice chat
+            // has no ringing notification and no timer at all: it is connected from the start.
+            else -> isVoiceChat(sbn) || startTimeMs != null
         }
 
         val actions = notification.actions.orEmpty().mapNotNull { action ->

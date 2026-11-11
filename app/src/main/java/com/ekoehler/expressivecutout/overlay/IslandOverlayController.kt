@@ -1486,7 +1486,7 @@ class IslandOverlayController(private val context: Context) {
      * width plus the gap — so what is tappable is exactly what is drawn.
      */
     private fun callCapsuleTouchRect(viewWidth: Int, viewHeight: Int): Rect? {
-        if (!isSplitCall()) return null
+        if (!isSplitCall() || !hasHangUpCapsule()) return null
         val dims = effectiveDims(layoutState.value, expanded = false)
         val gapPx = (callSplitGapDp(dims.isNotch) * density).toInt()
         val capsuleWidthPx = (callSplitHangUpWidthDp(dims.heightDp) * density).toInt()
@@ -1518,7 +1518,12 @@ class IslandOverlayController(private val context: Context) {
         val margin = (TOUCH_MARGIN_DP * density).toInt()
         val pillCenterX = viewWidth / 2 + (dims.offsetXDp * density).toInt()
         val capsuleCenterX = pillCenterX + pillWidthPx / 2 + gapPx + capsuleWidthPx / 2
-        val centerX = capsuleCenterX + capsuleWidthPx / 2 + gapPx + diameterPx / 2
+        // Without a hang-up capsule the button sits straight after the pill, as [DynamicIsland] draws it.
+        val centerX = if (hasHangUpCapsule()) {
+            capsuleCenterX + capsuleWidthPx / 2 + gapPx + diameterPx / 2
+        } else {
+            pillCenterX + pillWidthPx / 2 + gapPx + diameterPx / 2
+        }
         val topPx = (dims.offsetYDp * density).toInt()
         val bottomPx = topPx + diameterPx
         return Rect(
@@ -2127,6 +2132,9 @@ class IslandOverlayController(private val context: Context) {
      * Whether the shown call is drawn split — a narrow pill plus the detached hang-up capsule.
      * Mirrors [usesSplitCallCutout] so the touchable region matches what the island renders.
      */
+    /** Whether the call app gave a hang-up action, i.e. whether the split draws the capsule at all. */
+    private fun hasHangUpCapsule(): Boolean = currentEvent.value?.actions?.isNotEmpty() == true
+
     private fun isSplitCall(): Boolean = usesSplitCallCutout(
         event = currentEvent.value,
         callOngoing = OnCallBus.state.value?.ongoing == true,
