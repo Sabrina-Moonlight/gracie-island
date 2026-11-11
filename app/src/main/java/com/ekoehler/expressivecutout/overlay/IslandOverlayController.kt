@@ -1476,7 +1476,8 @@ class IslandOverlayController(private val context: Context) {
         val pill = pillTouchRect(viewWidth, viewHeight)
         val satellite = satelliteTouchRect(viewWidth, viewHeight)
         val callCapsule = callCapsuleTouchRect(viewWidth, viewHeight)
-        return listOfNotNull(pill, satellite, callCapsule)
+        val callDeafen = callDeafenTouchRect(viewWidth, viewHeight)
+        return listOfNotNull(pill, satellite, callCapsule, callDeafen)
     }
 
     /**
@@ -1499,6 +1500,31 @@ class IslandOverlayController(private val context: Context) {
             (capsuleCenterX - capsuleWidthPx / 2 - margin).coerceAtLeast(0),
             (topPx - margin).coerceAtLeast(0),
             (capsuleCenterX + capsuleWidthPx / 2 + margin).coerceAtMost(viewWidth),
+            (bottomPx + margin).coerceAtMost(if (viewHeight > 0) viewHeight else bottomPx + margin),
+        )
+    }
+
+    /**
+     * The deafen button's rectangle, or null unless a connected call is drawn split. Sits one gap past
+     * the hang-up capsule, mirroring the offsets [DynamicIsland] places it at.
+     */
+    private fun callDeafenTouchRect(viewWidth: Int, viewHeight: Int): Rect? {
+        if (!isSplitCall()) return null
+        val dims = effectiveDims(layoutState.value, expanded = false)
+        val gapPx = (callSplitGapDp(dims.isNotch) * density).toInt()
+        val capsuleWidthPx = (callSplitHangUpWidthDp(dims.heightDp) * density).toInt()
+        val diameterPx = (dims.heightDp * density).toInt()
+        val pillWidthPx = displayWidthPx * dims.widthPercent / 100 + notchOverhangPx(dims)
+        val margin = (TOUCH_MARGIN_DP * density).toInt()
+        val pillCenterX = viewWidth / 2 + (dims.offsetXDp * density).toInt()
+        val capsuleCenterX = pillCenterX + pillWidthPx / 2 + gapPx + capsuleWidthPx / 2
+        val centerX = capsuleCenterX + capsuleWidthPx / 2 + gapPx + diameterPx / 2
+        val topPx = (dims.offsetYDp * density).toInt()
+        val bottomPx = topPx + diameterPx
+        return Rect(
+            (centerX - diameterPx / 2 - margin).coerceAtLeast(0),
+            (topPx - margin).coerceAtLeast(0),
+            (centerX + diameterPx / 2 + margin).coerceAtMost(viewWidth),
             (bottomPx + margin).coerceAtMost(if (viewHeight > 0) viewHeight else bottomPx + margin),
         )
     }

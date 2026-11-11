@@ -24,11 +24,50 @@ object CallAudioBus {
     private val _speakerOn = MutableStateFlow(false)
     val speakerOn: StateFlow<Boolean> = _speakerOn.asStateFlow()
 
-    /** Re-reads the platform's microphone-mute and speakerphone state into the flows. */
+    private val _deafened = MutableStateFlow(false)
+    val deafened: StateFlow<Boolean> = _deafened.asStateFlow()
+
+    /** Whether the call stream was silenced by [toggleDeafen], so only our own silence is undone. */
+    private var deafenHeldByUs = false
+
+    /** Kept so [releaseDeafen] can run from [OnCallBus], which has no context of its own. */
+    private var appContext: Context? = null
+
+    /** Re-reads the platform's microphone-mute, speakerphone and call-stream state into the flows. */
     fun refresh(context: Context) {
         val audio = context.getSystemService<AudioManager>() ?: return
         _muted.value = audio.isMicrophoneMute
         _speakerOn.value = audio.speakerOn
+        _deafened.value = audio.isStreamMute(AudioManager.STREAM_VOICE_CALL)
+    }
+
+    /**
+     * Silences (or restores) everything the other side says: the voice-call stream, which is the one
+     * Discord and the dialer play a call on. No call app offers this as a notification action, so it
+     * is done on the stream itself, and re-read so the button shows what actually took effect.
+     */
+    fun toggleDeafen(context: Context) {
+        val audio = context.getSystemService<AudioManager>() ?: return
+        appContext = context.applicationContext
+        val silence = !audio.isStreamMute(AudioManager.STREAM_VOICE_CALL)
+        runCatching {
+            audio.adjustStreamVolume(
+                AudioManager.STREAM_VOICE_CALL,
+                if (silence) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE,
+                0,
+            )
+        }
+        _deafened.value = audio.isStreamMute(AudioManager.STREAM_VOICE_CALL)
+        deafenHeldByUs = _deafened.value
+    }
+
+    /** Called when the call ends: the stream mute outlives the call, so it must be lifted here. */
+    fun releaseDeafen() {
+        if (!deafenHeldByUs) return
+        deafenHeldByUs = false
+        val audio = appContext?.getSystemService<AudioManager>()
+        runCatching { audio?.adjustStreamVolume(AudioManager.STREAM_VOICE_CALL, AudioManager.ADJUST_UNMUTE, 0) }
+        _deafened.value = false
     }
 
     /** Flips the microphone mute, then re-reads it so the button shows what actually took effect. */

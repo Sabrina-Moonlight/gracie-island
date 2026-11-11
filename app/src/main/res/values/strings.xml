@@ -261,6 +261,8 @@
     <string name="phone_answer">Take</string>
     <string name="phone_hang_up">Hang up</string>
     <string name="phone_mute">Mute</string>
+    <string name="phone_deafen">Deafen</string>
+    <string name="phone_undeafen">Undeafen</string>
     <string name="phone_speaker">Speaker</string>
     <string name="phone_open">Open</string>
     <string name="phone_tile_note">The photo, name and buttons come from your dialer\'s ongoing-call notification, so exactly which buttons appear depends on your dialer.</string>

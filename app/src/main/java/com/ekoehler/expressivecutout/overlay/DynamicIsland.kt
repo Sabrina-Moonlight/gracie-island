@@ -66,6 +66,8 @@ import androidx.compose.material.icons.rounded.CallEnd
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Headset
+import androidx.compose.material.icons.rounded.HeadsetOff
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material.icons.rounded.Pause
@@ -1538,6 +1540,25 @@ fun DynamicIsland(
                     heightDp = dims.heightDp - capsuleInsetDp,
                     widthDp = capsuleWidthDp,
                     onAction = onAction,
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = capsuleReveal
+                        scaleY = capsuleReveal
+                        alpha = capsuleReveal
+                    },
+                )
+            }
+            // The deafen toggle rides one gap past the hang-up capsule: a round button as tall as it.
+            val deafenDiameterDp = dims.heightDp - capsuleInsetDp
+            val deafenStep = step + (capsuleWidthDp / 2).dp + callSplitGapDp(notched).dp +
+                (deafenDiameterDp / 2).dp
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(x = offsetX + deafenStep, y = offsetY + capsuleInsetDp.dp),
+            ) {
+                CallDeafenButton(
+                    call = capsuleCall,
+                    diameterDp = deafenDiameterDp,
                     modifier = Modifier.graphicsLayer {
                         scaleX = capsuleReveal
                         scaleY = capsuleReveal
@@ -4729,6 +4750,47 @@ private fun CallHangUpCapsule(
             Icon(
                 imageVector = Icons.Rounded.CallEnd,
                 contentDescription = stringResource(R.string.phone_hang_up),
+                modifier = Modifier.size(24.dp),
+            )
+        }
+    }
+}
+
+/**
+ * The connected call's deafen toggle, a round button beside the hang-up capsule: headset while the
+ * call is audible, crossed-out headset once everything the other side says is silenced. A tap flips
+ * it through [CallAudioBus]. Filled with the call tile's shared button colour.
+ */
+@Composable
+private fun CallDeafenButton(
+    call: CallTileOptions,
+    diameterDp: Int,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val deafened by CallAudioBus.deafened.collectAsStateWithLifecycle()
+    val interaction = remember { MutableInteractionSource() }
+    val fill = call.otherButtonColor.resolve()
+
+    // The dialer or the call app can change the stream behind our back, so re-read as the call shows.
+    LaunchedEffect(Unit) { CallAudioBus.refresh(context) }
+
+    Surface(
+        onClick = { CallAudioBus.toggleDeafen(context) },
+        interactionSource = interaction,
+        shape = CircleShape,
+        color = fill,
+        contentColor = if (fill.luminance() > 0.5f) PILL_TEXT_COLOR_DARK else PILL_TEXT_COLOR,
+        modifier = modifier
+            .size(diameterDp.dp)
+            .pressScale(interaction),
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = if (deafened) Icons.Rounded.HeadsetOff else Icons.Rounded.Headset,
+                contentDescription = stringResource(
+                    if (deafened) R.string.phone_undeafen else R.string.phone_deafen,
+                ),
                 modifier = Modifier.size(24.dp),
             )
         }

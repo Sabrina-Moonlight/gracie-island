@@ -19,6 +19,8 @@ object OnCallBus {
 
     fun update(state: OnCall?) {
         _state.value = state
+        // A call that is over must not leave its audio silenced for the next one.
+        if (state == null) CallAudioBus.releaseDeafen()
     }
 }
 
