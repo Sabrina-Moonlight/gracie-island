@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
+import android.os.SystemClock
 import androidx.core.content.getSystemService
 import com.ekoehler.expressivecutout.system.ShizukuState
 import com.ekoehler.expressivecutout.system.ShizukuStatus
@@ -17,6 +18,9 @@ import kotlinx.coroutines.launch
 
 /** The voice-chat app whose audio the deafen button silences when the call app is not known. */
 private const val DEFAULT_VOICE_APP = "com.discord"
+
+/** Taps closer together than this count as one, so a bounced touch can't undo its own toggle. */
+private const val TOGGLE_DEBOUNCE_MS = 600L
 
 /**
  * The in-call audio route behind the expanded phone tile's Mute and Speaker buttons. Dialers expose
@@ -55,6 +59,9 @@ object CallAudioBus {
     /** The voice-call volume before the fallback muted it, put back when the call is audible again. */
     private var savedCallVolume: Int? = null
 
+    /** When the last accepted tap happened, on the monotonic clock. */
+    private var lastToggleMs = 0L
+
     /** Kept so [releaseDeafen] can run from [OnCallBus], which has no context of its own. */
     private var appContext: Context? = null
 
@@ -74,10 +81,13 @@ object CallAudioBus {
      */
     fun toggleDeafen(context: Context) {
         appContext = context.applicationContext
-        val silence = !_deafened.value
-        _deafened.value = silence
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastToggleMs < TOGGLE_DEBOUNCE_MS) return
+        lastToggleMs = now
         scope.launch {
             synchronized(deafenLock) {
+                // Decided from what was really applied, never from the flow the button reads.
+                val silence = silencedApp == null && !streamMutedByUs
                 _deafened.value = if (silence) silenceCall() else restoreCall()
             }
         }
@@ -85,9 +95,8 @@ object CallAudioBus {
 
     /** Called when the call ends: the silence outlives the call, so it must be lifted here. */
     fun releaseDeafen() {
-        if (!_deafened.value) return
-        _deafened.value = false
-        scope.launch { synchronized(deafenLock) { restoreCall() } }
+        if (silencedApp == null && !streamMutedByUs) return
+        scope.launch { synchronized(deafenLock) { _deafened.value = restoreCall() } }
     }
 
     /** Silences the call and returns whether it is now silent. */
@@ -115,7 +124,11 @@ object CallAudioBus {
     private fun restoreCall(): Boolean {
         val app = silencedApp ?: DEFAULT_VOICE_APP
         if (ShizukuState.status.value == ShizukuStatus.READY) {
-            ShizukuState.runAsShell("appops set $app PLAY_AUDIO allow; appops set $app PLAY_AUDIO default")
+            ShizukuState.runAsShell(
+                listOf("allow", "default").joinToString("; ") { mode ->
+                    "appops set $app PLAY_AUDIO $mode; appops set --uid $app PLAY_AUDIO $mode"
+                },
+            )
         }
         silencedApp = null
         // Always checked, not only after our own fallback: a mute left on the stream by an earlier
