@@ -10,18 +10,25 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Headset
+import androidx.compose.material.icons.rounded.HeadsetOff
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.ekoehler.expressivecutout.R
 import com.ekoehler.expressivecutout.data.PermissionDotColors
 import com.ekoehler.expressivecutout.system.PermissionUsage
 import kotlin.math.roundToInt
@@ -36,6 +43,17 @@ internal const val DOT_GAP_FRACTION = 0.14f
  */
 private const val VERTICAL_DOT_SIZE_FRACTION = 0.15f
 private const val VERTICAL_DOT_GAP_FRACTION = 0.06f
+
+/**
+ * The microphone's slot holds the deafen button instead of a plain dot, so it is bigger: as large as
+ * the icon badge on the pill's other end. Stacked, it has to share the pill's height with the other
+ * two dots, so it shrinks to what still fits.
+ */
+private const val DEAFEN_SIZE_FRACTION = 0.72f
+private const val VERTICAL_DEAFEN_SIZE_FRACTION = 0.40f
+
+/** The headset glyph's share of the button's diameter. */
+private const val DEAFEN_ICON_FRACTION = 0.70f
 
 /**
  * The gap between the pill's icon and the first dot, as a fraction of the pill's height. Sized so
@@ -107,7 +125,10 @@ internal fun permissionDotRowWidthDp(usage: PermissionUsage, heightDp: Int, vert
     val count = if (vertical) 1 else usage.count
     val sizeFraction = if (vertical) VERTICAL_DOT_SIZE_FRACTION else DOT_SIZE_FRACTION
     val gapFraction = if (vertical) VERTICAL_DOT_GAP_FRACTION else DOT_GAP_FRACTION
-    val dots = count * heightDp * sizeFraction
+    // The microphone's slot is the deafen button, wider than the dot it stands in for.
+    val deafenFraction = if (vertical) VERTICAL_DEAFEN_SIZE_FRACTION else DEAFEN_SIZE_FRACTION
+    val deafenExtra = if (usage.microphone) heightDp * (deafenFraction - sizeFraction) else 0f
+    val dots = count * heightDp * sizeFraction + deafenExtra
     // Each dot carries half a gap on each side, so one gap per dot.
     val gaps = count * heightDp * gapFraction
     return (dots + gaps).roundToInt()
@@ -133,6 +154,9 @@ internal fun permissionDotLeadingInsetDp(usage: PermissionUsage, heightDp: Int, 
  * than by the row's arrangement, so the space a dot needs grows with it — an arrangement gap would
  * pop into place the moment the dot became visible.
  *
+ * The microphone's slot is a deafen button rather than a dot (see [DeafenButton]): [deafened] picks
+ * its glyph and [onToggleDeafen] is its tap.
+ *
  * Each dot takes its colour from [colors], the user's own pick per resource. With [vertical] the
  * same dots stack into a column instead, which keeps the row's footprint one dot wide however many
  * resources are lit — worth it on a narrow pill, at the cost of the dots being smaller than the
@@ -146,12 +170,16 @@ internal fun PermissionDotRow(
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
     fullSizeDots: Boolean = false,
+    deafened: Boolean = false,
+    onToggleDeafen: () -> Unit = {},
 ) {
     // Microphone, camera, location — declared once so both directions draw the same three dots.
     // [fullSizeDots] keeps the dots at their normal size even when stacked: the pill stuck to the
     // camera is long, so there is no need to shrink them.
     val dots: @Composable () -> Unit = {
-        PermissionDot(usage.microphone, colors.microphone.resolve(), heightDp, vertical, fullSizeDots)
+        DeafenButton(
+            usage.microphone, colors.microphone.resolve(), heightDp, vertical, fullSizeDots, deafened, onToggleDeafen,
+        )
         PermissionDot(usage.camera, colors.camera.resolve(), heightDp, vertical, fullSizeDots)
         PermissionDot(usage.location, colors.location.resolve(), heightDp, vertical, fullSizeDots)
     }
@@ -204,5 +232,56 @@ private fun PermissionDot(visible: Boolean, color: Color, heightDp: Int, vertica
                 .clip(CircleShape)
                 .background(color),
         )
+    }
+}
+
+/**
+ * The microphone's slot: a headset button that silences the call, drawn inside the pill in the
+ * microphone dot's own colour so it still reads as "the microphone is in use". It shows exactly while
+ * the microphone is — in practice while a call is on — whichever tile the pill is wearing, so it needs
+ * no phone tile. Appears and leaves the way a dot does, so its neighbours slide instead of jumping.
+ */
+@Composable
+private fun DeafenButton(
+    visible: Boolean,
+    color: Color,
+    heightDp: Int,
+    vertical: Boolean,
+    fullSize: Boolean,
+    deafened: Boolean,
+    onToggle: () -> Unit,
+) {
+    // Same gaps as the dots beside it, which keep their normal gap on the long stuck-to-camera pill.
+    val gapFraction = if (vertical && !fullSize) VERTICAL_DOT_GAP_FRACTION else DOT_GAP_FRACTION
+    val buttonFraction = if (vertical) VERTICAL_DEAFEN_SIZE_FRACTION else DEAFEN_SIZE_FRACTION
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn() + scaleIn(initialScale = 0.4f) +
+            if (vertical) expandVertically(clip = false) else expandHorizontally(clip = false),
+        exit = fadeOut() + scaleOut(targetScale = 0.4f) +
+            if (vertical) shrinkVertically(clip = false) else shrinkHorizontally(clip = false),
+    ) {
+        val gap = (heightDp * gapFraction / 2f).dp
+        val diameter = (heightDp * buttonFraction).dp
+        Box(
+            modifier = Modifier
+                .then(
+                    if (vertical) Modifier.padding(vertical = gap)
+                    else Modifier.padding(horizontal = gap)
+                )
+                .size(diameter)
+                .clip(CircleShape)
+                .clickable(onClick = onToggle),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = if (deafened) Icons.Rounded.HeadsetOff else Icons.Rounded.Headset,
+                contentDescription = stringResource(
+                    if (deafened) R.string.phone_undeafen else R.string.phone_deafen,
+                ),
+                tint = color,
+                modifier = Modifier.size(diameter * DEAFEN_ICON_FRACTION),
+            )
+        }
     }
 }

@@ -66,8 +66,6 @@ import androidx.compose.material.icons.rounded.CallEnd
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Headset
-import androidx.compose.material.icons.rounded.HeadsetOff
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material.icons.rounded.Pause
@@ -860,6 +858,19 @@ fun DynamicIsland(
     // Mounted for as long as the feature is on rather than only while something is in use, so each
     // dot fades in and out with its own resource instead of appearing the instant the row exists.
     val showPermissionDots = permissionDotsEnabled && !isExpanded && !isCall && !isTiny
+    // The microphone dot is the deafen button, so it needs the call's audio state and a way back to
+    // normal: a silence outlives the call, and with no phone tile there is no call event to end it.
+    // Waits a few seconds so the microphone blinking off mid-call doesn't lift it early.
+    val context = LocalContext.current
+    val deafened by CallAudioBus.deafened.collectAsStateWithLifecycle()
+    LaunchedEffect(permissionUsage.microphone) {
+        if (permissionUsage.microphone) {
+            CallAudioBus.refresh(context)
+        } else {
+            delay(DEAFEN_RELEASE_DELAY_MS)
+            CallAudioBus.releaseDeafen()
+        }
+    }
     val permissionDotsOnLeft = permissionDotPosition == PermissionDotPosition.LEFT
     // Only a tile that writes on the trailing edge — the timer's remaining time, a progress ring,
     // a battery percentage, the status dot — has anything for the dots to collide with. Everything
@@ -980,6 +991,8 @@ fun DynamicIsland(
             // The dots keep the same distance from the pill's end as on the normal pill, so the button
             // below them steps down by that extra margin whenever a dot is lit.
             (permissionUsage.count * collapsed.heightDp * (0.20f + 0.14f) + collapsed.heightDp * 0.06f +
+                // The microphone's slot holds the deafen button, which is bigger than a dot.
+                (if (permissionUsage.microphone) collapsed.heightDp * 0.20f else 0f) +
                 (if (permissionUsage.count > 0) permissionDotEndInsetDp(collapsed.heightDp) - collapsed.heightDp * 0.14f else 0f)).dp
         } else {
             0.dp
@@ -1460,6 +1473,8 @@ fun DynamicIsland(
                                 heightDp = collapsed.heightDp,
                                 vertical = permissionDotsVertical || isStickToCamera,
                                 fullSizeDots = isStickToCamera,
+                                deafened = deafened,
+                                onToggleDeafen = { CallAudioBus.toggleDeafen(context) },
                                 modifier = if (isStickToCamera) {
                                     Modifier
                                         .align(Alignment.TopCenter)
@@ -1548,29 +1563,6 @@ fun DynamicIsland(
                         },
                     )
                 }
-            }
-            // The deafen toggle rides one gap past the hang-up capsule: a round button as tall as it.
-            val deafenDiameterDp = dims.heightDp - capsuleInsetDp
-            // Takes the capsule's place when the call app gave no hang-up action to draw one for.
-            val deafenStep = if (capsuleAction != null) {
-                step + (capsuleWidthDp / 2).dp + callSplitGapDp(notched).dp + (deafenDiameterDp / 2).dp
-            } else {
-                revealWidth / 2 + callSplitGapDp(notched).dp + (deafenDiameterDp / 2).dp
-            }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(x = offsetX + deafenStep, y = offsetY + capsuleInsetDp.dp),
-            ) {
-                CallDeafenButton(
-                    call = capsuleCall,
-                    diameterDp = deafenDiameterDp,
-                    modifier = Modifier.graphicsLayer {
-                        scaleX = capsuleReveal
-                        scaleY = capsuleReveal
-                        alpha = capsuleReveal
-                    },
-                )
             }
         }
     }
@@ -2633,6 +2625,12 @@ private fun TinyTileContent(
         }
     }
 }
+
+/**
+ * How long the microphone has to stay off before a deafened call is brought back to normal, so a
+ * pause in recording mid-call doesn't lift it.
+ */
+private const val DEAFEN_RELEASE_DELAY_MS = 4_000L
 
 /** The share of the tiny cutout's height left as padding at each end. */
 private const val TINY_INSET_FRACTION = 0.18f
@@ -4545,8 +4543,7 @@ internal fun callSplitHangUpWidthDp(heightDp: Int): Int = (heightDp * CALL_SPLIT
  * Whether the call cutout is drawn split — the normal pill plus the detached hang-up capsule. Only a
  * connected call at its normal size qualifies: a ringing one needs its caller and two buttons, the
  * tiny "Mini call" pill has room for neither, and the expanded card carries its own hang-up row.
- * There is nothing to detach when the user hid the buttons. A call app that offers no action still
- * splits, because the deafen toggle beside the pill needs nothing from the app.
+ * There is nothing to detach when the user hid the buttons or the call app offers no action.
  */
 internal fun usesSplitCallCutout(
     event: IslandEvent?,
@@ -4555,7 +4552,7 @@ internal fun usesSplitCallCutout(
     tiny: Boolean,
 ): Boolean {
     val call = event?.call ?: return false
-    return callOngoing && !expanded && !tiny && call.showActions
+    return callOngoing && !expanded && !tiny && call.showActions && event.actions.isNotEmpty()
 }
 
 /**
@@ -4757,47 +4754,6 @@ private fun CallHangUpCapsule(
             Icon(
                 imageVector = Icons.Rounded.CallEnd,
                 contentDescription = stringResource(R.string.phone_hang_up),
-                modifier = Modifier.size(24.dp),
-            )
-        }
-    }
-}
-
-/**
- * The connected call's deafen toggle, a round button beside the hang-up capsule: headset while the
- * call is audible, crossed-out headset once everything the other side says is silenced. A tap flips
- * it through [CallAudioBus]. Filled with the call tile's shared button colour.
- */
-@Composable
-private fun CallDeafenButton(
-    call: CallTileOptions,
-    diameterDp: Int,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    val deafened by CallAudioBus.deafened.collectAsStateWithLifecycle()
-    val interaction = remember { MutableInteractionSource() }
-    val fill = call.otherButtonColor.resolve()
-
-    // The dialer or the call app can change the stream behind our back, so re-read as the call shows.
-    LaunchedEffect(Unit) { CallAudioBus.refresh(context) }
-
-    Surface(
-        onClick = { CallAudioBus.toggleDeafen(context) },
-        interactionSource = interaction,
-        shape = CircleShape,
-        color = fill,
-        contentColor = if (fill.luminance() > 0.5f) PILL_TEXT_COLOR_DARK else PILL_TEXT_COLOR,
-        modifier = modifier
-            .size(diameterDp.dp)
-            .pressScale(interaction),
-    ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = if (deafened) Icons.Rounded.HeadsetOff else Icons.Rounded.Headset,
-                contentDescription = stringResource(
-                    if (deafened) R.string.phone_undeafen else R.string.phone_deafen,
-                ),
                 modifier = Modifier.size(24.dp),
             )
         }
