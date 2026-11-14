@@ -103,12 +103,17 @@ object CallAudioBus {
         return streamMutedByUs
     }
 
-    /** Undoes whatever [silenceCall] did, and returns false: the call is audible again. */
+    /**
+     * Undoes whatever [silenceCall] did, and returns false: the call is audible again. The voice app
+     * is always let through, even when nothing is remembered as silenced, and is allowed outright
+     * before going back to the default so the system sees a real change and un-mutes the live call.
+     */
     private fun restoreCall(): Boolean {
-        silencedApp?.let { app ->
-            ShizukuState.runAsShell("appops set $app PLAY_AUDIO default")
-            silencedApp = null
+        val app = silencedApp ?: DEFAULT_VOICE_APP
+        if (ShizukuState.status.value == ShizukuStatus.READY) {
+            ShizukuState.runAsShell("appops set $app PLAY_AUDIO allow; appops set $app PLAY_AUDIO default")
         }
+        silencedApp = null
         if (streamMutedByUs) {
             val audio = appContext?.getSystemService<AudioManager>()
             runCatching { audio?.adjustStreamVolume(AudioManager.STREAM_VOICE_CALL, AudioManager.ADJUST_UNMUTE, 0) }
