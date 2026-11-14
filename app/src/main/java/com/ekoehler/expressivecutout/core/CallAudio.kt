@@ -52,6 +52,9 @@ object CallAudioBus {
     /** Whether the voice-call stream was muted by [toggleDeafen] as the fallback, without Shizuku. */
     private var streamMutedByUs = false
 
+    /** The voice-call volume before the fallback muted it, put back when the call is audible again. */
+    private var savedCallVolume: Int? = null
+
     /** Kept so [releaseDeafen] can run from [OnCallBus], which has no context of its own. */
     private var appContext: Context? = null
 
@@ -98,6 +101,7 @@ object CallAudioBus {
             return true
         }
         val audio = appContext?.getSystemService<AudioManager>() ?: return false
+        savedCallVolume = audio.getStreamVolume(AudioManager.STREAM_VOICE_CALL)
         runCatching { audio.adjustStreamVolume(AudioManager.STREAM_VOICE_CALL, AudioManager.ADJUST_MUTE, 0) }
         streamMutedByUs = audio.isStreamMute(AudioManager.STREAM_VOICE_CALL)
         return streamMutedByUs
@@ -114,11 +118,21 @@ object CallAudioBus {
             ShizukuState.runAsShell("appops set $app PLAY_AUDIO allow; appops set $app PLAY_AUDIO default")
         }
         silencedApp = null
-        if (streamMutedByUs) {
-            val audio = appContext?.getSystemService<AudioManager>()
-            runCatching { audio?.adjustStreamVolume(AudioManager.STREAM_VOICE_CALL, AudioManager.ADJUST_UNMUTE, 0) }
-            streamMutedByUs = false
+        // Always checked, not only after our own fallback: a mute left on the stream by an earlier
+        // try would otherwise keep the call silent however the app op is set.
+        val audio = appContext?.getSystemService<AudioManager>()
+        if (audio != null && (streamMutedByUs || audio.isStreamMute(AudioManager.STREAM_VOICE_CALL))) {
+            runCatching { audio.adjustStreamVolume(AudioManager.STREAM_VOICE_CALL, AudioManager.ADJUST_UNMUTE, 0) }
+            if (audio.isStreamMute(AudioManager.STREAM_VOICE_CALL)) {
+                @Suppress("DEPRECATION")
+                runCatching { audio.setStreamMute(AudioManager.STREAM_VOICE_CALL, false) }
+            }
+            savedCallVolume?.let { volume ->
+                runCatching { audio.setStreamVolume(AudioManager.STREAM_VOICE_CALL, volume, 0) }
+            }
         }
+        streamMutedByUs = false
+        savedCallVolume = null
         return false
     }
 
