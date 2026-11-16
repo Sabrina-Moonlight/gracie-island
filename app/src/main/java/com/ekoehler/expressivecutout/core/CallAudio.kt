@@ -101,7 +101,10 @@ object CallAudioBus {
         if (healChecked || silencedApp != null || streamMutedByUs) return
         val state = appOpState(DEFAULT_VOICE_APP) ?: return
         healChecked = true
-        if (state.isSilenced()) liftAppOp(DEFAULT_VOICE_APP)
+        // A live sound can stay silenced even with the permission already back on allow.
+        val stuck = ShizukuState.shellOutput("dumpsys audio | grep -i opPlayAudio")
+            ?.isNotBlank() == true
+        if (state.isSilenced() || stuck) liftAppOp(DEFAULT_VOICE_APP)
     }
 
     /** What `appops` reports for [app]'s audio, or null when Shizuku could not be asked. */
@@ -117,19 +120,20 @@ object CallAudioBus {
     }.getOrNull()
 
     /**
-     * Lets [app] play again at both levels the system keeps the setting: its package and its numeric
-     * UID (a silence left on the UID overrides the package one). Each goes to allow first and then
-     * back to the default, so the system sees a real change and un-mutes the live call. What the
-     * system reports afterwards is checked and the whole thing retried, because a silence that quietly
-     * stayed is the bug. Returns whether the app is audible again.
+     * Lets [app] play again. Setting the permission to allow is not enough: a sound that was already
+     * silenced keeps its silence while the permission is merely "allow" (the system only re-checks it
+     * on a real change). So the numeric UID is taken through ignore and then allow, which makes the
+     * system re-check the live call, and the package is left on allow. What the system reports
+     * afterwards is checked and the whole thing retried. Returns whether the app is audible again.
      */
     private fun liftAppOp(app: String): Boolean {
         val uid = uidOf(app)
-        val script = listOf("allow", "default").joinToString("; ") { mode ->
-            buildString {
-                append("appops set $app PLAY_AUDIO $mode")
-                if (uid != null) append("; appops set --uid $uid PLAY_AUDIO $mode")
+        val script = buildString {
+            if (uid != null) {
+                append("appops set --uid $uid PLAY_AUDIO ignore; ")
+                append("appops set --uid $uid PLAY_AUDIO allow; ")
             }
+            append("appops set $app PLAY_AUDIO allow")
         }
         repeat(LIFT_ATTEMPTS) {
             ShizukuState.runAsShell(script)
