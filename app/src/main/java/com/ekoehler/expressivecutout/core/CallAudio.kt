@@ -5,6 +5,7 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import androidx.core.content.getSystemService
 import com.ekoehler.expressivecutout.system.ShizukuState
 import com.ekoehler.expressivecutout.system.ShizukuStatus
@@ -18,6 +19,14 @@ import kotlinx.coroutines.launch
 
 /** The voice-chat app whose audio the deafen button silences when the call app is not known. */
 private const val DEFAULT_VOICE_APP = "com.discord"
+
+private const val TAG = "CallAudio"
+
+/** How many times lifting the silence is tried before giving up, each one checked afterwards. */
+private const val LIFT_ATTEMPTS = 3
+
+/** Pause before the system is asked whether the silence is really gone, so it has applied it. */
+private const val LIFT_SETTLE_MS = 250L
 
 /** Taps closer together than this count as one, so a bounced touch can't undo its own toggle. */
 private const val TOGGLE_DEBOUNCE_MS = 600L
@@ -67,9 +76,69 @@ object CallAudioBus {
 
     /** Re-reads the platform's microphone-mute and speakerphone state into the flows. */
     fun refresh(context: Context) {
+        appContext = context.applicationContext
         val audio = context.getSystemService<AudioManager>() ?: return
         _muted.value = audio.isMicrophoneMute
         _speakerOn.value = audio.speakerOn
+        healStaleSilence()
+    }
+
+    /** Whether the check for a silence left behind by an earlier run has already been done. */
+    private var healChecked = false
+
+    /**
+     * A silence set by an earlier run (or version) of the app outlives it and nothing remembers it,
+     * which would leave the call app mute for good. Once per run, when a call starts, ask the system
+     * what it really holds for the call app and lift it if it is still silenced.
+     */
+    private fun healStaleSilence() {
+        if (healChecked || ShizukuState.status.value != ShizukuStatus.READY) return
+        scope.launch { synchronized(deafenLock) { healLocked() } }
+    }
+
+    /** The body of [healStaleSilence]; runs under [deafenLock], so it never races a tap. */
+    private fun healLocked() {
+        if (healChecked || silencedApp != null || streamMutedByUs) return
+        val state = appOpState(DEFAULT_VOICE_APP) ?: return
+        healChecked = true
+        if (state.isSilenced()) liftAppOp(DEFAULT_VOICE_APP)
+    }
+
+    /** What `appops` reports for [app]'s audio, or null when Shizuku could not be asked. */
+    private fun appOpState(app: String): String? =
+        ShizukuState.shellOutput("appops get $app PLAY_AUDIO 2>&1")
+
+    private fun String.isSilenced() = contains("ignore", ignoreCase = true) ||
+        contains("deny", ignoreCase = true)
+
+    /** The numeric UID of [app], which `appops --uid` needs: it does not take a package name. */
+    private fun uidOf(app: String): Int? = runCatching {
+        appContext?.packageManager?.getApplicationInfo(app, 0)?.uid
+    }.getOrNull()
+
+    /**
+     * Lets [app] play again at both levels the system keeps the setting: its package and its numeric
+     * UID (a silence left on the UID overrides the package one). Each goes to allow first and then
+     * back to the default, so the system sees a real change and un-mutes the live call. What the
+     * system reports afterwards is checked and the whole thing retried, because a silence that quietly
+     * stayed is the bug. Returns whether the app is audible again.
+     */
+    private fun liftAppOp(app: String): Boolean {
+        val uid = uidOf(app)
+        val script = listOf("allow", "default").joinToString("; ") { mode ->
+            buildString {
+                append("appops set $app PLAY_AUDIO $mode")
+                if (uid != null) append("; appops set --uid $uid PLAY_AUDIO $mode")
+            }
+        }
+        repeat(LIFT_ATTEMPTS) {
+            ShizukuState.runAsShell(script)
+            Thread.sleep(LIFT_SETTLE_MS)
+            val state = appOpState(app)
+            Log.i(TAG, "PLAY_AUDIO of $app after lifting: $state")
+            if (state != null && !state.isSilenced()) return true
+        }
+        return false
     }
 
     /**
@@ -117,18 +186,21 @@ object CallAudioBus {
     }
 
     /**
-     * Undoes whatever [silenceCall] did, and returns false: the call is audible again. The voice app
-     * is always let through, even when nothing is remembered as silenced, and is allowed outright
-     * before going back to the default so the system sees a real change and un-mutes the live call.
+     * Undoes whatever [silenceCall] did, and returns whether the call is still silent. The voice app
+     * is always let through, even when nothing is remembered as silenced. If the system still holds
+     * the silence after every try, it stays remembered and this returns true, so the button tells the
+     * truth and the next tap tries again.
      */
     private fun restoreCall(): Boolean {
         val app = silencedApp ?: DEFAULT_VOICE_APP
         if (ShizukuState.status.value == ShizukuStatus.READY) {
-            ShizukuState.runAsShell(
-                listOf("allow", "default").joinToString("; ") { mode ->
-                    "appops set $app PLAY_AUDIO $mode; appops set --uid $app PLAY_AUDIO $mode"
-                },
-            )
+            if (!liftAppOp(app)) {
+                silencedApp = app
+                return true
+            }
+        } else if (silencedApp != null) {
+            // Shizuku is out of reach, so the silence cannot be lifted yet; tapping again retries.
+            return true
         }
         silencedApp = null
         // Always checked, not only after our own fallback: a mute left on the stream by an earlier
