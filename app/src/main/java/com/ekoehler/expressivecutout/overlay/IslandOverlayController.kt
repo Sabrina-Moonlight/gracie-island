@@ -718,10 +718,12 @@ class IslandOverlayController(private val context: Context) {
                 }
                 val isStickToCamera = orientation == Configuration.ORIENTATION_LANDSCAPE &&
                     behaviour.horizontalCutoutMode == HorizontalCutoutMode.STICK_TO_CAMERA
-                val rot270 = rotation == Surface.ROTATION_270
                 val cameraOnRight = remember(orientation, rotation) {
                     (getLandscapeCameraGravity() and Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.RIGHT
                 }
+                // Stuck to the camera, the pill must sit on the same edge the window is anchored to
+                // (the real camera side), not the edge the rotation value suggests.
+                val rot270 = if (isStickToCamera) cameraOnRight else rotation == Surface.ROTATION_270
 
                 ExpressiveCutoutTheme {
                     DynamicIsland(
@@ -1562,7 +1564,8 @@ class IslandOverlayController(private val context: Context) {
             val edgePx = (dims.offsetYDp * density).toInt()
             // The strip sits against the edge the camera is on: the left one unless the display is
             // turned the other way, mirroring how [DynamicIsland] aligns it.
-            val left = if (currentRotation == Surface.ROTATION_270) viewWidth - edgePx - widthPx else edgePx
+            val cameraOnRight = (getLandscapeCameraGravity() and Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.RIGHT
+            val left = if (cameraOnRight) viewWidth - edgePx - widthPx else edgePx
             val top = (viewHeight - lengthPx) / 2
             return Rect(
                 (left - margin).coerceAtLeast(0),
