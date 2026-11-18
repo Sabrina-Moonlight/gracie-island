@@ -68,6 +68,9 @@ object CallAudioBus {
     /** The voice-call volume before the fallback muted it, put back when the call is audible again. */
     private var savedCallVolume: Int? = null
 
+    /** Whether the microphone was muted by [toggleDeafen] (it was open before), so only then is it opened again. */
+    private var micMutedByUs = false
+
     /** When the last accepted tap happened, on the monotonic clock. */
     private var lastToggleMs = 0L
 
@@ -172,8 +175,34 @@ object CallAudioBus {
         scope.launch { synchronized(deafenLock) { _deafened.value = restoreCall() } }
     }
 
-    /** Silences the call and returns whether it is now silent. */
+    /** Silences the call and the microphone, and returns whether the call is now silent. */
     private fun silenceCall(): Boolean {
+        val silent = silenceAudio()
+        if (silent) muteMic()
+        return silent
+    }
+
+    /** Deafening also mutes the microphone, unless the user had already muted it themselves. */
+    private fun muteMic() {
+        val audio = appContext?.getSystemService<AudioManager>() ?: return
+        if (!audio.isMicrophoneMute) {
+            runCatching { audio.isMicrophoneMute = true }
+            micMutedByUs = audio.isMicrophoneMute
+        }
+        _muted.value = audio.isMicrophoneMute
+    }
+
+    /** Opens the microphone again, but only if [muteMic] is what closed it. */
+    private fun unmuteMic() {
+        if (!micMutedByUs) return
+        val audio = appContext?.getSystemService<AudioManager>() ?: return
+        runCatching { audio.isMicrophoneMute = false }
+        micMutedByUs = false
+        _muted.value = audio.isMicrophoneMute
+    }
+
+    /** The part of [silenceCall] that silences what the other side says. */
+    private fun silenceAudio(): Boolean {
         val callApp = OnCallBus.state.value?.packageName
         val voiceApp = (callApp ?: DEFAULT_VOICE_APP).takeIf { it == DEFAULT_VOICE_APP }
         if (voiceApp != null && ShizukuState.status.value == ShizukuStatus.READY &&
@@ -196,6 +225,13 @@ object CallAudioBus {
      * truth and the next tap tries again.
      */
     private fun restoreCall(): Boolean {
+        val stillSilent = restoreAudio()
+        if (!stillSilent) unmuteMic()
+        return stillSilent
+    }
+
+    /** The part of [restoreCall] that lets the other side be heard again. */
+    private fun restoreAudio(): Boolean {
         val app = silencedApp ?: DEFAULT_VOICE_APP
         if (ShizukuState.status.value == ShizukuStatus.READY) {
             if (!liftAppOp(app)) {

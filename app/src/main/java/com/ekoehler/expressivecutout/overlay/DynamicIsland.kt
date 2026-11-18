@@ -2466,6 +2466,7 @@ private fun CollapsedContent(
         event.progressData?.takeIf { !isStickToCamera && !it.isComplete }?.let { progress ->
             CollapsedProgressIndicator(
                 progress = progress,
+                color = event.primaryColor(),
                 heightDp = heightDp,
                 trailingInsetDp = trailingInsetDp,
                 modifier = Modifier.align(Alignment.CenterEnd),
@@ -2646,15 +2647,16 @@ private val TINY_CALL_GLYPH = IslandIcon.Vector(Icons.Rounded.PhoneInTalk)
 @Composable
 private fun CollapsedProgressIndicator(
     progress: ProgressData,
+    color: Color,
     heightDp: Int,
     trailingInsetDp: Int,
     modifier: Modifier = Modifier,
 ) {
     val indicatorSize = (heightDp * 0.5f).dp
     val strokeWidth = (heightDp * 0.06f).dp
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
-    val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
+    val primaryColor = color
+    val primaryContainer = color.copy(alpha = 0.25f)
+    val onPrimaryColor = if (color.luminance() > 0.5f) PILL_TEXT_COLOR_DARK else PILL_TEXT_COLOR
 
     val indicatorModifier = modifier
         .padding(end = (heightDp * COLLAPSED_TRAILING_INSET_FRACTION).dp + trailingInsetDp.dp)
