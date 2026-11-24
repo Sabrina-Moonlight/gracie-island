@@ -9,7 +9,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.ekoehler.expressivecutout"
+        applicationId = "com.gracie.island"
         minSdk = 29
         targetSdk = 35
         versionCode = 7
