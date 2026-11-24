@@ -871,7 +871,6 @@ fun DynamicIsland(
             CallAudioBus.releaseDeafen()
         }
     }
-    val permissionDotsOnLeft = permissionDotPosition == PermissionDotPosition.LEFT
     // Only a tile that writes on the trailing edge — the timer's remaining time, a progress ring,
     // a battery percentage, the status dot — has anything for the dots to collide with. Everything
     // else has empty pill there, so the dots fit as they are and the pill is left at the width the
@@ -889,20 +888,6 @@ fun DynamicIsland(
     val hasTrailingContent = !emptyPill &&
         ((event ?: shownEvent)?.hasCollapsedTrailingContent() == true || statusDotOnPill)
 
-    // The status dot never starts before the badge, so it steps past dots drawn on the left
-    val collapsedLeadingInsetDp = if (showPermissionDots && !isStickToCamera && permissionDotsOnLeft) {
-        permissionDotLeadingInsetDp(permissionUsage, collapsed.heightDp, permissionDotsVertical)
-    } else {
-        0
-    }
-
-    // Room for dots beside that content: the pill grows to the right by this much and the content is
-    // inset by the same amount, so the content doesn't move and the dots sit in the new space.
-    val collapsedTrailingInsetDp = if (showPermissionDots && !isStickToCamera && !permissionDotsOnLeft && hasTrailingContent) {
-        permissionDotTrailingInsetDp(permissionUsage, collapsed.heightDp, permissionDotsVertical)
-    } else {
-        0
-    }
 
     // With a bubble up, the pair shares the normal cutout's width rather than growing past it: the
     // pill gives up the bubble's diameter plus the gap, and the two together still span exactly the
@@ -927,6 +912,42 @@ fun DynamicIsland(
     val pillLeftBaseDp = dims.offsetXDp + satelliteShiftDp -
         (displayWidthExactDp * dims.widthPercent / 100f - satelliteSplitDp) / 2f
     val pillRightBaseDp = pillLeftBaseDp + (displayWidthExactDp * dims.widthPercent / 100f - satelliteSplitDp)
+    // The dots go on the side the user chose, unless that side has less room than the other: then
+    // they use the free black space on the other side instead of growing the pill. Only when
+    // neither side has room does the pill grow (on both sides, see below).
+    val permissionDotsOnLeft = permissionDotsOnLeftSide(
+        configuredLeft = permissionDotPosition == PermissionDotPosition.LEFT,
+        usage = permissionUsage,
+        heightDp = collapsed.heightDp,
+        vertical = permissionDotsVertical,
+        pillLeftBaseDp = pillLeftBaseDp,
+        pillRightBaseDp = pillRightBaseDp,
+        cameraLeftEdgeDp = cameraLeftEdgeDp,
+        cameraRightEdgeDp = cameraRightEdgeDp,
+        trailingContentWidthDp = if (emptyPill) {
+            0f
+        } else {
+            (event ?: shownEvent)?.collapsedTrailingContentWidthDp(collapsed.heightDp, statusDotOnPill) ?: 0f
+        },
+    )
+
+    // The status dot never starts before the badge, so it steps past dots drawn on the left
+    val collapsedLeadingInsetDp = if (showPermissionDots && !isStickToCamera && permissionDotsOnLeft) {
+        permissionDotLeadingInsetDp(permissionUsage, collapsed.heightDp, permissionDotsVertical)
+    } else {
+        0
+    }
+
+    // Room for dots beside that content: the pill grows to the right by this much and the content is
+    // inset by the same amount, so the content doesn't move and the dots sit in the new space.
+    val collapsedTrailingInsetDp = if (showPermissionDots && !isStickToCamera && !permissionDotsOnLeft &&
+        (hasTrailingContent || (!emptyPill && cameraRightEdgeDp != null))
+    ) {
+        permissionDotTrailingInsetDp(permissionUsage, collapsed.heightDp, permissionDotsVertical)
+    } else {
+        0
+    }
+
     // The dots' room is only added to the pill when its own width has no spare space for it.
     val collapsedTrailingGrowthDp = if (collapsedTrailingInsetDp > 0) {
         permissionDotTrailingGrowthDp(
@@ -959,11 +980,23 @@ fun DynamicIsland(
     // Trailing text (the battery percentage) must not sit under the camera: the pill widens on both
     // sides, staying centred, until the text starts past the hole.
     val textGrowthDp = if (!emptyPill && !isStickToCamera && !isTiny && !isCall && !isExpanded) {
-        trailingTextGrowthDp(
-            pillRightBaseDp,
-            cameraRightEdgeDp,
-            collapsed.heightDp,
-            (event ?: shownEvent)?.collapsedTrailingTextLength() ?: 0,
+        maxOf(
+            trailingTextGrowthDp(
+                pillRightBaseDp,
+                cameraRightEdgeDp,
+                collapsed.heightDp,
+                (event ?: shownEvent)?.collapsedTrailingTextLength() ?: 0,
+            ),
+            // Whatever the pill draws, the camera never covers it: widens only if it doesn't fit.
+            cameraClearGrowthDp(
+                pillLeftBaseDp,
+                pillRightBaseDp,
+                cameraLeftEdgeDp,
+                cameraRightEdgeDp,
+                collapsed.heightDp,
+                collapsedLeadingInsetDp,
+                (event ?: shownEvent)?.collapsedTrailingContentWidthDp(collapsed.heightDp, false) ?: 0f,
+            ),
         )
     } else {
         0
@@ -2286,6 +2319,78 @@ internal fun trailingTextGrowthDp(
     val textStart = pillRightEdgeDp - heightDp * COLLAPSED_TRAILING_INSET_FRACTION - textWidth
     return kotlin.math.ceil(cameraRightEdgeDp + STATUS_DOT_CAMERA_GAP_DP - textStart)
         .coerceAtLeast(0f).toInt()
+}
+
+/**
+ * How far the collapsed pill has to grow on EACH side so nothing it draws ends up under the camera
+ * hole, whatever width the user chose: the badge (and any dots beside it) must end before the hole's
+ * left edge, and the trailing content (timer, progress ring, music button, text) must start past its
+ * right edge. Zero when everything already fits, or when the device reports no cutout, so the pill
+ * only widens when it has to and otherwise keeps using its own empty space.
+ *
+ * Shared by [DynamicIsland]'s drawing and the overlay's window sizing.
+ *
+ * @param pillLeftBaseDp the pill's leading edge at the width the user chose, from the screen's centre.
+ * @param pillRightBaseDp the pill's trailing edge at that width, from the same centre.
+ * @param cameraLeftEdgeDp the camera's left edge, from the same centre (negative to the left).
+ * @param cameraRightEdgeDp the camera's right edge, from the same centre.
+ * @param leadingInsetDp room taken beside the badge on the leading side, see [statusDotMinStartDp].
+ * @param trailingContentWidthDp see [collapsedTrailingContentWidthDp] (without the status dot, which
+ *   grows the pill on its own).
+ */
+internal fun cameraClearGrowthDp(
+    pillLeftBaseDp: Float,
+    pillRightBaseDp: Float,
+    cameraLeftEdgeDp: Float?,
+    cameraRightEdgeDp: Float?,
+    heightDp: Int,
+    leadingInsetDp: Int,
+    trailingContentWidthDp: Float,
+): Int {
+    if (cameraLeftEdgeDp == null || cameraRightEdgeDp == null) return 0
+    val leadingEnd = pillLeftBaseDp +
+        heightDp * (COLLAPSED_BADGE_INSET_FRACTION + BADGE_SIZE_FRACTION) + leadingInsetDp
+    val leftNeed = leadingEnd - (cameraLeftEdgeDp - STATUS_DOT_CAMERA_GAP_DP)
+    val rightNeed = if (trailingContentWidthDp > 0f) {
+        val trailingStart = pillRightBaseDp - heightDp * COLLAPSED_TRAILING_INSET_FRACTION - trailingContentWidthDp
+        cameraRightEdgeDp + STATUS_DOT_CAMERA_GAP_DP - trailingStart
+    } else {
+        0f
+    }
+    return kotlin.math.ceil(maxOf(leftNeed, rightNeed)).coerceAtLeast(0f).toInt()
+}
+
+/**
+ * Whether the permission dots are drawn on the pill's left. They keep the side the user chose
+ * ([configuredLeft]) unless the other side would need less growth of the pill to seat them, so free
+ * black space is used before the pill widens. Both sides are measured the way the pill grows for
+ * them: the right by what its trailing content leaves free past the camera, the left by what lies
+ * between the badge and the camera. Falls back to the chosen side when the camera can't be measured.
+ *
+ * Shared by [DynamicIsland]'s drawing and the overlay's window sizing.
+ *
+ * @param trailingContentWidthDp see [collapsedTrailingContentWidthDp] (with the status dot, if shown).
+ */
+internal fun permissionDotsOnLeftSide(
+    configuredLeft: Boolean,
+    usage: PermissionUsage,
+    heightDp: Int,
+    vertical: Boolean,
+    pillLeftBaseDp: Float,
+    pillRightBaseDp: Float,
+    cameraLeftEdgeDp: Float?,
+    cameraRightEdgeDp: Float?,
+    trailingContentWidthDp: Float,
+): Boolean {
+    if (usage.count == 0 || cameraLeftEdgeDp == null || cameraRightEdgeDp == null) return configuredLeft
+    val rightRoom = permissionDotTrailingInsetDp(usage, heightDp, vertical)
+    val needRight = (
+        rightRoom - permissionDotSpareRoomDp(pillRightBaseDp, cameraRightEdgeDp, heightDp, trailingContentWidthDp)
+        ).coerceAtLeast(0f)
+    val dotsEnd = pillLeftBaseDp + permissionDotStartInsetDp(heightDp) +
+        permissionDotRowWidthDp(usage, heightDp, vertical)
+    val needLeft = (dotsEnd - (cameraLeftEdgeDp - STATUS_DOT_CAMERA_GAP_DP)).coerceAtLeast(0f)
+    return if (configuredLeft) needLeft <= needRight else needLeft < needRight
 }
 
 /**

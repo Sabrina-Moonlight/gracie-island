@@ -83,6 +83,8 @@ object CallAudioBus {
         val audio = context.getSystemService<AudioManager>() ?: return
         _muted.value = audio.isMicrophoneMute
         _speakerOn.value = audio.speakerOn
+        // The button must show what is really held, not what an earlier tap hoped for.
+        _deafened.value = silencedApp != null || streamMutedByUs
         healStaleSilence()
     }
 
@@ -143,9 +145,16 @@ object CallAudioBus {
             Thread.sleep(LIFT_SETTLE_MS)
             val state = appOpState(app)
             Log.i(TAG, "PLAY_AUDIO of $app after lifting: $state")
-            if (state != null && !state.isSilenced()) return true
+            if (state != null && !state.isSilenced() && !liveSilenceStuck(app, uid)) return true
         }
         return false
+    }
+
+    /** Whether the system still lists a sound of [app] as silenced by the audio permission. */
+    private fun liveSilenceStuck(app: String, uid: Int?): Boolean {
+        val out = ShizukuState.shellOutput("dumpsys audio | grep -i opPlayAudio") ?: return false
+        if (out.isBlank()) return false
+        return out.contains(app) || (uid != null && out.contains(uid.toString()))
     }
 
     /**
@@ -171,7 +180,10 @@ object CallAudioBus {
 
     /** Called when the call ends: the silence outlives the call, so it must be lifted here. */
     fun releaseDeafen() {
-        if (silencedApp == null && !streamMutedByUs) return
+        if (silencedApp == null && !streamMutedByUs) {
+            if (micMutedByUs) scope.launch { synchronized(deafenLock) { unmuteMic() } }
+            return
+        }
         scope.launch { synchronized(deafenLock) { _deafened.value = restoreCall() } }
     }
 
@@ -265,6 +277,7 @@ object CallAudioBus {
     fun toggleMute(context: Context) {
         val audio = context.getSystemService<AudioManager>() ?: return
         runCatching { audio.isMicrophoneMute = !audio.isMicrophoneMute }
+        micMutedByUs = false
         _muted.value = audio.isMicrophoneMute
     }
 

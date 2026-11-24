@@ -1677,16 +1677,17 @@ class IslandOverlayController(private val context: Context) {
     private fun permissionDotWidthBonusDp(expanded: Boolean): Int {
         if (expanded) return 0
         if (!permissionDotEnabledState.value && !PermissionDotPreviewBus.active.value) return 0
-        if (permissionDotPositionState.value != PermissionDotPosition.RIGHT) return 0
         val event = currentEvent.value
         if (event?.call != null) return 0
-        // Only grown for a tile that writes on the trailing edge; elsewhere the dots fit as they are.
         if (event == null) return 0
         val isStickToCamera = orientationState.value == Configuration.ORIENTATION_LANDSCAPE &&
             behaviourState.value.horizontalCutoutMode == HorizontalCutoutMode.STICK_TO_CAMERA
         val statusDotShown = event.statusDotColor != null && behaviourState.value.showStatusDot &&
             !isTinyTile(event) && !isStickToCamera
-        if (!event.hasCollapsedTrailingContent() && !statusDotShown) return 0
+        // Dots seated on the left (see [dotsOnLeftNow]) grow the pill through the camera rule instead.
+        if (dotsOnLeftNow(statusDotShown)) return 0
+        // With nothing on the trailing edge the dots fit as they are, unless the camera is in the way.
+        if (!event.hasCollapsedTrailingContent() && !statusDotShown && cameraRightEdgeDp.value == null) return 0
         val collapsed = layoutState.value.collapsed
         val roomDp = permissionDotTrailingInsetDp(
             PermissionUsageMonitor.usage.value,
@@ -1735,7 +1736,7 @@ class IslandOverlayController(private val context: Context) {
         val pillLeftBaseDp = collapsed.offsetXDp + shiftDp -
             (displayWidthExactDp.value * collapsed.widthPercent / 100f - splitDp) / 2f
         val pillLeftDp = pillLeftBaseDp - permissionDotWidthBonusDp(false)
-        val leftDotsDp = if (permissionDotsOnLeft()) {
+        val leftDotsDp = if (dotsOnLeftNow(statusDotShownOnPill(event))) {
             permissionDotLeadingInsetDp(
                 PermissionUsageMonitor.usage.value,
                 collapsed.heightDp,
@@ -1772,15 +1773,70 @@ class IslandOverlayController(private val context: Context) {
         }
         val width = displayWidthExactDp.value * collapsed.widthPercent / 100f - splitDp
         val pillRightDp = collapsed.offsetXDp + shiftDp + width / 2f
-        return trailingTextGrowthDp(
-            pillRightDp, cameraRightEdgeDp.value, collapsed.heightDp, event.collapsedTrailingTextLength(),
+        val pillLeftDp = collapsed.offsetXDp + shiftDp - width / 2f
+        val leftDotsDp = if (dotsOnLeftNow(statusDotShownOnPill(event))) {
+            permissionDotLeadingInsetDp(
+                PermissionUsageMonitor.usage.value,
+                collapsed.heightDp,
+                permissionDotVerticalState.value,
+            )
+        } else {
+            0
+        }
+        return maxOf(
+            trailingTextGrowthDp(
+                pillRightDp, cameraRightEdgeDp.value, collapsed.heightDp, event.collapsedTrailingTextLength(),
+            ),
+            // Same rule [DynamicIsland] applies: nothing drawn may end up under the camera.
+            cameraClearGrowthDp(
+                pillLeftDp,
+                pillRightDp,
+                cameraLeftEdgeDp.value,
+                cameraRightEdgeDp.value,
+                collapsed.heightDp,
+                leftDotsDp,
+                event.collapsedTrailingContentWidthDp(collapsed.heightDp, false),
+            ),
         )
     }
 
-    /** Whether the permission dots are showing, as [DynamicIsland] draws them, on the pill's left. */
-    private fun permissionDotsOnLeft(): Boolean =
-        (permissionDotEnabledState.value || PermissionDotPreviewBus.active.value) &&
-            permissionDotPositionState.value == PermissionDotPosition.LEFT
+    /** Whether the collapsed pill shows its status dot for [event], under the same conditions [DynamicIsland] does. */
+    private fun statusDotShownOnPill(event: IslandEvent): Boolean {
+        if (event.statusDotColor == null || !behaviourState.value.showStatusDot) return false
+        if (event.call != null || isTinyTile(event)) return false
+        return !(orientationState.value == Configuration.ORIENTATION_LANDSCAPE &&
+            behaviourState.value.horizontalCutoutMode == HorizontalCutoutMode.STICK_TO_CAMERA)
+    }
+
+    /**
+     * Whether the permission dots are drawn on the pill's left right now: the side the user chose,
+     * unless the other side has more room (see [permissionDotsOnLeftSide]). Same inputs and same rule
+     * as [DynamicIsland], so the window and the touchable region follow the dots.
+     */
+    private fun dotsOnLeftNow(statusDotShown: Boolean): Boolean {
+        if (!(permissionDotEnabledState.value || PermissionDotPreviewBus.active.value)) return false
+        val collapsed = layoutState.value.collapsed
+        val splitDp = satelliteSplitDp()
+        val shiftDp = when {
+            splitDp == 0 -> 0f
+            behaviourState.value.satellitePosition == SatellitePosition.LEFT -> splitDp / 2f
+            else -> -splitDp / 2f
+        }
+        val width = displayWidthExactDp.value * collapsed.widthPercent / 100f - splitDp
+        val left = collapsed.offsetXDp + shiftDp - width / 2f
+        return permissionDotsOnLeftSide(
+            configuredLeft = permissionDotPositionState.value == PermissionDotPosition.LEFT,
+            usage = PermissionUsageMonitor.usage.value,
+            heightDp = collapsed.heightDp,
+            vertical = permissionDotVerticalState.value,
+            pillLeftBaseDp = left,
+            pillRightBaseDp = left + width,
+            cameraLeftEdgeDp = cameraLeftEdgeDp.value,
+            cameraRightEdgeDp = cameraRightEdgeDp.value,
+            trailingContentWidthDp =
+                currentEvent.value?.collapsedTrailingContentWidthDp(collapsed.heightDp, statusDotShown) ?: 0f,
+        )
+    }
 
     /**
      * How much width the collapsed pill gives up to the bubble beside it — the bubble's diameter (the
