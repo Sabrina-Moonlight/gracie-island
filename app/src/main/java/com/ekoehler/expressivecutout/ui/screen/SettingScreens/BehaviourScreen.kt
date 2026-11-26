@@ -27,13 +27,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.core.view.HapticFeedbackConstantsCompat
 import com.ekoehler.expressivecutout.R
 import com.ekoehler.expressivecutout.data.BehaviourSettings
 import com.ekoehler.expressivecutout.data.HorizontalCutoutMode
 import com.ekoehler.expressivecutout.data.PinNotificationsMode
 import com.ekoehler.expressivecutout.data.SatellitePosition
-import com.ekoehler.expressivecutout.overlay.expandedActionsExtraDp
 import com.ekoehler.expressivecutout.ui.AppViewModel
 import com.ekoehler.expressivecutout.ui.components.OptionSelectionCard
 import com.ekoehler.expressivecutout.ui.components.PageTitle

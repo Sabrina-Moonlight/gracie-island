@@ -127,28 +127,6 @@ class ExpandedNotificationHeightTest {
     }
 
     @Test
-    fun `estimate notification content height precomputes multiline height with padding`() {
-        val topMarginDp = 36
-        val buttonHeightDp = 44
-
-        val estimatedHeight = estimateNotificationContentHeightDp(
-            topMarginDp = topMarginDp,
-            titleLines = 1,
-            detailLines = 4,
-            secondaryLinesCount = 0,
-            hasHeader = false,
-            hasActions = true,
-            buttonHeightDp = buttonHeightDp,
-            hasProgress = false,
-        )
-
-        assertTrue(
-            "Estimated height ($estimatedHeight) should accommodate multiline content and action row",
-            estimatedHeight >= topMarginDp + 86 + 12 + buttonHeightDp + EXPANDED_NOTIFICATION_BOTTOM_PADDING_DP,
-        )
-    }
-
-    @Test
     fun `unbounded inner measure settles to wrap-content even if the first frame is short`() {
         val collapsed = 34
         val expanded = 108

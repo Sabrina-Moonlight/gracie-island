@@ -1,6 +1,5 @@
 package com.ekoehler.expressivecutout.ui
 
-import android.content.Context
 import android.widget.Toast
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
@@ -33,8 +32,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCompositionContext
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -63,7 +60,6 @@ import com.ekoehler.expressivecutout.ui.screen.ProfileTab
 import com.ekoehler.expressivecutout.ui.screen.SettingsRoute
 import com.ekoehler.expressivecutout.ui.screen.SettingsTab
 import com.ekoehler.expressivecutout.ui.screen.parent
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 

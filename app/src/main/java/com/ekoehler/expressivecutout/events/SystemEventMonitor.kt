@@ -405,9 +405,10 @@ class SystemEventMonitor(
             buildIntentFilter(),
             ContextCompat.RECEIVER_EXPORTED,
         )
-        audioManager?.registerAudioDeviceCallback(audioDeviceCallback, null)
-        connectivityManager?.registerNetworkCallback(wifiRequest(), wifiCallback)
-        connectivityManager?.registerNetworkCallback(vpnRequest(), vpnCallback)
+        // Each registration is guarded: one the system refuses must not stop the rest from starting.
+        runCatching { audioManager?.registerAudioDeviceCallback(audioDeviceCallback, null) }
+        runCatching { connectivityManager?.registerNetworkCallback(wifiRequest(), wifiCallback) }
+        runCatching { connectivityManager?.registerNetworkCallback(vpnRequest(), vpnCallback) }
 
         runCatching {
             val uri = Settings.Global.getUriFor(GLOBAL_ADB_WIFI_ENABLED)
@@ -432,9 +433,9 @@ class SystemEventMonitor(
         scope.cancel()
         runCatching { context.unregisterReceiver(broadcastReceiver) }
         runCatching { context.contentResolver.unregisterContentObserver(adbWifiObserver) }
-        audioManager?.unregisterAudioDeviceCallback(audioDeviceCallback)
-        connectivityManager?.unregisterNetworkCallback(wifiCallback)
-        connectivityManager?.unregisterNetworkCallback(vpnCallback)
+        runCatching { audioManager?.unregisterAudioDeviceCallback(audioDeviceCallback) }
+        runCatching { connectivityManager?.unregisterNetworkCallback(wifiCallback) }
+        runCatching { connectivityManager?.unregisterNetworkCallback(vpnCallback) }
     }
 
     /** Checks wireless ADB setting and emits connect / disconnect events accordingly. */

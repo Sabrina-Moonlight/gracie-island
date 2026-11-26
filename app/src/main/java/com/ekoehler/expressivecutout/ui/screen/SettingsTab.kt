@@ -1,6 +1,5 @@
 package com.ekoehler.expressivecutout.ui.screen
 
-import android.app.Application
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.rememberScrollState
@@ -47,7 +46,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.ekoehler.expressivecutout.ExpressiveCutoutApp
 import com.ekoehler.expressivecutout.R
 import com.ekoehler.expressivecutout.core.DynamicTile
 import com.ekoehler.expressivecutout.core.SystemEventType

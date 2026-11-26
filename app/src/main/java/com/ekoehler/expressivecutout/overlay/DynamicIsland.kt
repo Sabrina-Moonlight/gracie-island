@@ -167,7 +167,6 @@ import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.toUpperCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -191,7 +190,6 @@ import com.ekoehler.expressivecutout.data.AnimationSpeed
 import com.ekoehler.expressivecutout.data.AnimationStyle
 import com.ekoehler.expressivecutout.data.AppearanceSettings
 import com.ekoehler.expressivecutout.data.CenterShortcut
-import com.ekoehler.expressivecutout.data.DEFAULT_CAMERA_RADIUS_DP
 import com.ekoehler.expressivecutout.data.CutoutColor
 import com.ekoehler.expressivecutout.data.GestureAction
 import com.ekoehler.expressivecutout.data.IconSource
@@ -398,34 +396,6 @@ internal fun calculateExpandedNotificationHeightDp(
     return (topMarginDp + measuredInnerHeightDp + bottomPaddingDp)
         .coerceAtLeast(baseExpandedHeightDp)
         .coerceAtMost(maxHeightLimitDp)
-}
-
-/**
- * Estimates the total height needed to display an expanded notification given its text components,
- * actions, and progress state, providing a smooth precomputed height target before expansion.
- */
-internal fun estimateNotificationContentHeightDp(
-    topMarginDp: Int,
-    titleLines: Int = 1,
-    detailLines: Int = 1,
-    secondaryLinesCount: Int = 0,
-    hasHeader: Boolean = false,
-    hasActions: Boolean = false,
-    buttonHeightDp: Int = 44,
-    hasProgress: Boolean = false,
-    bottomPaddingDp: Int = EXPANDED_NOTIFICATION_BOTTOM_PADDING_DP,
-): Int {
-    val headerHeight = if (hasHeader) 16 else 0
-    val titleHeight = maxOf(1, titleLines) * 24
-    val detailHeight = maxOf(0, detailLines) * 20
-    val secondaryHeight = if (secondaryLinesCount > 0) secondaryLinesCount * 20 else 0
-    val progressHeight = if (hasProgress) (PROGRESS_BAR_HEIGHT_DP + PROGRESS_BAR_TOP_GAP_DP) else 0
-    val textBlockHeight = headerHeight + titleHeight + detailHeight + secondaryHeight + progressHeight
-
-    val contentRowHeight = maxOf(44, textBlockHeight)
-    val actionsHeight = if (hasActions) (ACTIONS_ROW_SPACING_DP + buttonHeightDp) else 0
-
-    return topMarginDp + contentRowHeight + actionsHeight + bottomPaddingDp
 }
 
 /**

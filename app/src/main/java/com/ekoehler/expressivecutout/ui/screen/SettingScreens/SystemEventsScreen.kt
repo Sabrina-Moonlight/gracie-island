@@ -14,15 +14,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
@@ -37,8 +34,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -75,7 +70,6 @@ import com.ekoehler.expressivecutout.R
 import com.ekoehler.expressivecutout.core.SystemEventFamily
 import com.ekoehler.expressivecutout.core.SystemEventType
 import com.ekoehler.expressivecutout.data.CutoutColor
-import com.ekoehler.expressivecutout.data.BehaviourSettings
 import com.ekoehler.expressivecutout.data.DynamicRole
 import com.ekoehler.expressivecutout.data.IconSource
 import com.ekoehler.expressivecutout.overlay.animatedIcon
@@ -88,7 +82,6 @@ import com.ekoehler.expressivecutout.overlay.onForRole
 import com.ekoehler.expressivecutout.overlay.resolve
 import com.ekoehler.expressivecutout.ui.AppViewModel
 import com.ekoehler.expressivecutout.ui.components.ExpressivePillRow
-import com.ekoehler.expressivecutout.ui.components.PageTitle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

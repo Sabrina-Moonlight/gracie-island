@@ -32,11 +32,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,10 +43,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ekoehler.expressivecutout.R
 import com.ekoehler.expressivecutout.data.MusicButtonStyle
@@ -59,13 +55,11 @@ import com.ekoehler.expressivecutout.ui.AppViewModel
 import com.ekoehler.expressivecutout.ui.components.ColorPickerCard
 import com.ekoehler.expressivecutout.ui.components.ExpressivePillRow
 import com.ekoehler.expressivecutout.ui.components.ExpressiveSegmentedRow
-import com.ekoehler.expressivecutout.ui.components.OptionSelectionCard
 import com.ekoehler.expressivecutout.ui.components.PageTitle
 import com.ekoehler.expressivecutout.ui.components.rememberRobotoFlexFamily
 import com.ekoehler.expressivecutout.ui.components.groupedShape
 import com.ekoehler.expressivecutout.ui.screen.AdjustableSlider
 import com.ekoehler.expressivecutout.ui.screen.SettingsToggleCard
-import kotlinx.coroutines.selects.select
 import kotlin.math.roundToInt
 
 /** The pink tile accent, used as the play/pause default and the preview backdrop's default fill. */

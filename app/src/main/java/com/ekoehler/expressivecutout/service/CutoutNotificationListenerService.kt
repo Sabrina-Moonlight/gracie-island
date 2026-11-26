@@ -520,7 +520,7 @@ class CutoutNotificationListenerService : NotificationListenerService() {
      * is told apart from the same one coming back.
      */
     private fun fingerprint(packageName: String, title: String?, text: String?): String =
-        "$packageName ${title.orEmpty()} ${text.orEmpty()}"
+        "$packageName\u0000${title.orEmpty()}\u0000${text.orEmpty()}"
 
     /**
      * Whether [fingerprint] is still under suppression, pruning it in passing once its window has run

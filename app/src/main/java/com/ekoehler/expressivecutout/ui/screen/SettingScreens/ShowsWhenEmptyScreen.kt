@@ -67,9 +67,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ekoehler.expressivecutout.R
 import com.ekoehler.expressivecutout.data.CenterShortcut
 import com.ekoehler.expressivecutout.data.EmptyClickAction
-import com.ekoehler.expressivecutout.data.IconSource
 import com.ekoehler.expressivecutout.overlay.CenterShortcutCatalog
-import com.ekoehler.expressivecutout.overlay.resolve
 import com.ekoehler.expressivecutout.ui.components.ColorPickerCard
 import com.ekoehler.expressivecutout.ui.AppViewModel
 import com.ekoehler.expressivecutout.ui.components.PageTitle

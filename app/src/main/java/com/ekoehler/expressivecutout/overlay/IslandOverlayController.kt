@@ -579,11 +579,10 @@ class IslandOverlayController(private val context: Context) {
         }
         // In landscape mode, size relative to portrait width so the pill remains reasonably sized
         // and leaves ample space on either side of the top edge for the notification shade pull.
-        return if (currentOrientation == Configuration.ORIENTATION_LANDSCAPE) {
-            minOf(width, height)
-        } else {
-            width
-        }
+        // Judge landscape from the window's own shape, not from [currentOrientation]: this runs while
+        // the properties are still initialising (before [currentOrientation] has a value) and during a
+        // rotation (before it is updated), when that field would still be wrong.
+        return if (width > height) minOf(width, height) else width
     }
 
     /**
@@ -3042,11 +3041,6 @@ class IslandOverlayController(private val context: Context) {
         }
 
     /**
-     * Which edge the (rotated) landscape pill hugs. Derived from the camera cutout's real position
-     * (left/right half of the landscape screen) so it tracks the actual hole, falling back to the
-     * display rotation when the cutout can't be measured.
-     */
-    /**
      * The camera cutout's right edge relative to the screen's horizontal centre, in dp. Null when
      * the device reports no cutout, which leaves [asTinyCutout] to assume a centred hole.
      */
@@ -3063,6 +3057,11 @@ class IslandOverlayController(private val context: Context) {
         return (bounds.left - widthPx / 2f) / density
     }
 
+    /**
+     * Which edge the (rotated) landscape pill hugs. Derived from the camera cutout's real position
+     * (left/right half of the landscape screen) so it tracks the actual hole, falling back to the
+     * display rotation when the cutout can't be measured.
+     */
     private fun getLandscapeCameraGravity(): Int {
         // Measured off the display, never off [composeView]: in this very mode the window is a narrow
         // band already hugging one edge, so its own insets would report the hole relative to wherever

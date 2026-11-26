@@ -67,7 +67,6 @@ import com.ekoehler.expressivecutout.overlay.badgeIconSizeFor
 import com.ekoehler.expressivecutout.overlay.outlineStroke
 import com.ekoehler.expressivecutout.ui.AppViewModel
 import com.ekoehler.expressivecutout.ui.components.ColorPickerCard
-import com.ekoehler.expressivecutout.ui.components.MaterialCard
 import com.ekoehler.expressivecutout.ui.components.PageTitle
 import com.ekoehler.expressivecutout.ui.components.groupedShape
 import kotlinx.coroutines.delay

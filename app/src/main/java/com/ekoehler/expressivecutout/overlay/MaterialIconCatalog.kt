@@ -7,7 +7,6 @@ import androidx.compose.material.icons.rounded.Anchor
 import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Bookmark
-import androidx.compose.material.icons.rounded.BatteryAlert
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.BatteryFull
 import androidx.compose.material.icons.rounded.Cake

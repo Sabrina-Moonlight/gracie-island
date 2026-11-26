@@ -18,8 +18,6 @@ import androidx.core.content.ContextCompat
 import com.ekoehler.expressivecutout.R
 import com.ekoehler.expressivecutout.core.CutoutSignal
 import com.ekoehler.expressivecutout.core.IslandEventBus
-import com.ekoehler.expressivecutout.core.SystemEventPayload
-import com.ekoehler.expressivecutout.core.SystemEventType
 import com.ekoehler.expressivecutout.overlay.NotificationHeaderResolver
 import com.ekoehler.expressivecutout.service.ProgressData
 import kotlinx.coroutines.CoroutineScope
@@ -422,23 +420,6 @@ object TestNotifier {
             flags = flags or PendingIntent.FLAG_IMMUTABLE
         }
         return PendingIntent.getActivity(context, 10, intent, flags)
-    }
-
-    /**
-     * Emits a system event so the status dot and cutout reaction can be tested immediately.
-     */
-    fun sendSystemEvent(
-        type: SystemEventType,
-        batteryLevel: Int? = null,
-    ) {
-        IslandEventBus.emit(CutoutSignal.System(type, batteryLevel))
-    }
-
-    /**
-     * Emits a rich system event payload for test previews.
-     */
-    fun sendSystemEvent(payload: SystemEventPayload) {
-        IslandEventBus.emit(CutoutSignal.System(payload))
     }
 
     /** A mutable broadcast [PendingIntent] to [TestReplyReceiver]; mutability lets reply text fill in. */

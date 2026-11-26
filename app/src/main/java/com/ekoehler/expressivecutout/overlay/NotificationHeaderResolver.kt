@@ -62,23 +62,4 @@ object NotificationHeaderResolver {
             else -> null
         }
     }
-
-    /**
-     * Convenience function to resolve relative timestamp and format the notification header text.
-     */
-    fun resolveHeader(
-        appName: String?,
-        postTimeMs: Long?,
-        showAppName: Boolean,
-        showTimestamp: Boolean,
-        nowMs: Long = System.currentTimeMillis(),
-    ): String? {
-        val relativeTime = postTimeMs?.let { formatRelativeTime(it, nowMs) }
-        return formatHeader(
-            appName = appName,
-            relativeTime = relativeTime,
-            showAppName = showAppName,
-            showTimestamp = showTimestamp,
-        )
-    }
 }

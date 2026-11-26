@@ -57,7 +57,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.core.view.HapticFeedbackConstantsCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ekoehler.expressivecutout.R
 import com.ekoehler.expressivecutout.data.AppLanguage

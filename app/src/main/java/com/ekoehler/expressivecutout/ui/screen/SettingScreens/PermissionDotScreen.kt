@@ -38,7 +38,6 @@ import com.ekoehler.expressivecutout.data.CutoutColor
 import com.ekoehler.expressivecutout.data.DEFAULT_CAMERA_DOT_COLOR
 import com.ekoehler.expressivecutout.data.DEFAULT_LOCATION_DOT_COLOR
 import com.ekoehler.expressivecutout.data.DEFAULT_MICROPHONE_DOT_COLOR
-import com.ekoehler.expressivecutout.data.PermissionDotColors
 import com.ekoehler.expressivecutout.data.PermissionDotPosition
 import com.ekoehler.expressivecutout.overlay.resolve
 import com.ekoehler.expressivecutout.permissions.Permissions

@@ -7,7 +7,6 @@ import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.util.LruCache
-import android.widget.Space
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
@@ -78,7 +77,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import java.time.temporal.IsoFields
 
 /** An installed app the user can allow or mute. Icons are loaded per row, not held here. */
 internal data class InstalledApp(

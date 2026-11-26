@@ -6,9 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -25,9 +23,7 @@ import androidx.compose.material.icons.rounded.BatterySaver
 import androidx.compose.material.icons.rounded.Circle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.NetworkCell
-import androidx.compose.material.icons.rounded.NetworkCheck
 import androidx.compose.material.icons.rounded.NetworkWifi
-import androidx.compose.material.icons.rounded.ShapeLine
 import androidx.compose.material.icons.rounded.Square
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults

@@ -258,9 +258,6 @@ class AppearancePreferences(private val context: Context) : JsonSerializable {
             if (obj.has("sentAlignment")) {
                 SentAlignment.deserialize(obj.optString("sentAlignment"))?.let { a -> it[SENT_ALIGNMENT] = a.name }
             }
-            if (obj.has("showFullNotificationText")) {
-                it[SHOW_FULL_NOTIFICATION_TEXT] = obj.getBoolean("showFullNotificationText")
-            }
             if (obj.has("pageTransitionStyle")) {
                 PageTransitionStyle.entries.firstOrNull { it.name == obj.optString("pageTransitionStyle") }
                     ?.let { style -> it[PAGE_TRANSITION_STYLE] = style.name }

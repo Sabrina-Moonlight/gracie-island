@@ -130,44 +130,4 @@ class NotificationHeaderResolverTest {
         val after = System.currentTimeMillis()
         org.junit.Assert.assertTrue(resolved in before..after)
     }
-
-    @Test
-    fun testResolveHeaderConvenience() {
-        val now = 1_000_000L
-        val header = NotificationHeaderResolver.resolveHeader(
-            appName = "TestApp",
-            postTimeMs = now - 5_000L,
-            showAppName = true,
-            showTimestamp = true,
-            nowMs = now,
-        )
-        assertEquals("TestApp • 5s ago", header)
-    }
-
-    @Test
-    fun testResolveHeaderSystemEvent() {
-        val now = 1_000_000L
-        val header = NotificationHeaderResolver.resolveHeader(
-            appName = "Expressive Cutout",
-            postTimeMs = now,
-            showAppName = true,
-            showTimestamp = true,
-            nowMs = now,
-        )
-        assertEquals("Expressive Cutout • Now", header)
-    }
-
-    @Test
-    fun testResolveHeaderHiddenPreferences() {
-        val now = 1_000_000L
-        assertNull(
-            NotificationHeaderResolver.resolveHeader(
-                appName = "Expressive Cutout",
-                postTimeMs = now,
-                showAppName = false,
-                showTimestamp = false,
-                nowMs = now,
-            )
-        )
-    }
 }
