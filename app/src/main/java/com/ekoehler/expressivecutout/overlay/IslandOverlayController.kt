@@ -189,6 +189,15 @@ class IslandOverlayController(private val context: Context) {
     private val rotationState = MutableStateFlow(currentRotation)
 
     /**
+     * True when the landscape camera is on the right edge. A flow (not computed once per rotation in
+     * the composition) so it can be re-measured just after a rotation, when Android sometimes still
+     * reports the old display values.
+     */
+    private val cameraOnRightState = MutableStateFlow(
+        (getLandscapeCameraGravity() and Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.RIGHT,
+    )
+
+    /**
      * Set while a rotation cross-fade is applying the new geometry with the island hidden, so the
      * pill snaps to its new shape/placement instead of sliding there — the movement stays invisible
      * and only the fade is seen.
@@ -643,18 +652,41 @@ class IslandOverlayController(private val context: Context) {
             .start()
     }
 
+    /** Re-read the screen width, the camera position and the camera side from the live display. */
+    private fun refreshGeometry() {
+        displayWidthPx = computeDisplayWidthPx()
+        displayWidthDp.value = (displayWidthPx / density).toInt()
+        displayWidthExactDp.value = displayWidthPx / density
+        cameraRightEdgeDp.value = measureCameraRightEdgeDp()
+        cameraLeftEdgeDp.value = measureCameraLeftEdgeDp()
+        cameraOnRightState.value =
+            (getLandscapeCameraGravity() and Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.RIGHT
+    }
+
+    /** Second look at the geometry shortly after a rotation; re-places the window only if it changed. */
+    private fun remeasureAfterRotation() {
+        if (composeView == null || currentDisplayRotation() != currentRotation) return
+        refreshGeometry()
+        if (overlayHidden) return
+        windowResizeJob?.cancel()
+        resizeWindow(
+            windowWidthPx(layoutState.value),
+            windowHeightPx(layoutState.value, expanded),
+        )
+    }
+
     /** Adopt a new orientation/rotation: resize to the live width and re-place the window. */
     private fun applyRotation(orientation: Int, rotation: Int) {
         currentOrientation = orientation
         currentRotation = rotation
         orientationState.value = orientation
         rotationState.value = rotation
-        displayWidthPx = computeDisplayWidthPx()
-        displayWidthDp.value = (displayWidthPx / density).toInt()
-        displayWidthExactDp.value = displayWidthPx / density
-        cameraRightEdgeDp.value = measureCameraRightEdgeDp()
-        cameraLeftEdgeDp.value = measureCameraLeftEdgeDp()
+        refreshGeometry()
         applyLockVisibility()
+        // Right after a rotation Android can still hand out the previous display's cutout and size, which
+        // leaves the island on the wrong edge or the wrong width. Measure again once it has settled.
+        composeView?.postDelayed({ remeasureAfterRotation() }, REMEASURE_DELAY_MS)
+        composeView?.postDelayed({ remeasureAfterRotation() }, REMEASURE_DELAY_MS * 3)
         if (overlayHidden) return
         // Resize straight to the final geometry in one step (not the usual grow-then-shrink), while the
         // island is still invisible mid cross-fade. The delayed shrink would otherwise fire after the
@@ -717,9 +749,7 @@ class IslandOverlayController(private val context: Context) {
                 }
                 val isStickToCamera = orientation == Configuration.ORIENTATION_LANDSCAPE &&
                     behaviour.horizontalCutoutMode == HorizontalCutoutMode.STICK_TO_CAMERA
-                val cameraOnRight = remember(orientation, rotation) {
-                    (getLandscapeCameraGravity() and Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.RIGHT
-                }
+                val cameraOnRight by cameraOnRightState.collectAsStateWithLifecycle()
                 // Stuck to the camera, the pill must sit on the same edge the window is anchored to
                 // (the real camera side), not the edge the rotation value suggests.
                 val rot270 = if (isStickToCamera) cameraOnRight else rotation == Surface.ROTATION_270
@@ -3046,14 +3076,18 @@ class IslandOverlayController(private val context: Context) {
      */
     private fun measureCameraRightEdgeDp(): Float? {
         val bounds = CutoutMetrics.displayCutoutBoundsPx(context) ?: return null
-        val (widthPx, _) = currentScreenSizePx()
+        val (widthPx, heightPx) = currentScreenSizePx()
+        // In landscape the hole sits on a side edge, nowhere near the centred pill. Measured from the
+        // centre it would read as hundreds of dp and make the pill grow to "clear" it.
+        if (widthPx > heightPx) return null
         return (bounds.right - widthPx / 2f) / density
     }
 
     /** The camera cutout's left edge relative to the screen's horizontal centre, in dp. Null without a cutout. */
     private fun measureCameraLeftEdgeDp(): Float? {
         val bounds = CutoutMetrics.displayCutoutBoundsPx(context) ?: return null
-        val (widthPx, _) = currentScreenSizePx()
+        val (widthPx, heightPx) = currentScreenSizePx()
+        if (widthPx > heightPx) return null
         return (bounds.left - widthPx / 2f) / density
     }
 
@@ -3133,6 +3167,7 @@ class IslandOverlayController(private val context: Context) {
     }
 
     internal companion object {
+        private const val REMEASURE_DELAY_MS = 250L
         fun shouldCollapseOnOutsideTouch(isExpanded: Boolean, previewPinned: Boolean): Boolean =
             isExpanded && !previewPinned
         const val TAG = "IslandOverlay"
