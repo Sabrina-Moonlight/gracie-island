@@ -71,7 +71,6 @@ import com.ekoehler.expressivecutout.overlay.CenterShortcutCatalog
 import com.ekoehler.expressivecutout.ui.components.ColorPickerCard
 import com.ekoehler.expressivecutout.ui.AppViewModel
 import com.ekoehler.expressivecutout.ui.components.PageTitle
-import com.ekoehler.expressivecutout.ui.components.ColorPickerCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

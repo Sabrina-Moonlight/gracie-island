@@ -4,7 +4,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import com.ekoehler.expressivecutout.R
-import com.ekoehler.expressivecutout.core.CutoutSignal
 import com.ekoehler.expressivecutout.core.SystemEventType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

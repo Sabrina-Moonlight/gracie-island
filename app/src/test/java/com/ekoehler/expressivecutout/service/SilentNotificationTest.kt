@@ -3,7 +3,6 @@ package com.ekoehler.expressivecutout.service
 import android.app.NotificationManager
 import com.ekoehler.expressivecutout.core.CutoutSignal
 import com.ekoehler.expressivecutout.data.BehaviourSettings
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

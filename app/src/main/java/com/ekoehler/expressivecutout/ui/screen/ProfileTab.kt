@@ -64,7 +64,6 @@ import com.ekoehler.expressivecutout.data.AppLanguages
 import com.ekoehler.expressivecutout.system.AppLocale
 import com.ekoehler.expressivecutout.ui.AppViewModel
 import com.ekoehler.expressivecutout.ui.pageTransition
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ekoehler.expressivecutout.ui.components.ExpressiveSegmentedRow
 import com.ekoehler.expressivecutout.ui.components.groupedShape
 import com.ekoehler.expressivecutout.ui.theme.AppTheme
